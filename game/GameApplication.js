@@ -4,7 +4,6 @@ import { FrameCommandQueue } from './FrameCommandQueue.js';
 import { GameLoop } from './GameLoop.js';
 import { GameStateMachine } from './GameStateMachine.js';
 import { LevelLoader } from './level/LevelLoader.js';
-import { loadRoadTextures } from './level/loadRoadTextures.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { PhysicsSystem } from './systems/PhysicsSystem.js';
 import { UISystem } from './systems/UISystem.js';
@@ -206,8 +205,9 @@ export class GameApplication {
   }
 
   async start() {
+    console.log('[marble] loading level manifest…');
     await this._loadLevelBundle();
-    await this._loadRoadTextures();
+    console.log('[marble] ready — flat materials only; filter [procgen] or [level] for timings.');
     this._registerCommands();
     this._wireUi();
     this.ui.showMenu();
@@ -225,30 +225,22 @@ export class GameApplication {
     }
   }
 
-  async _loadRoadTextures() {
-    try {
-      const { straight, plaza } = await loadRoadTextures();
-      this._materials.roadStraight = straight;
-      this._materials.roadPlaza = plaza;
-    } catch (e) {
-      console.warn('Road textures could not be loaded; using flat segment colours.', e);
-    }
-  }
-
   _registerCommands() {
     this.queue.register('START_GAME', () => {
       this._devMode = !!this.ui.devModeCheckbox?.checked;
       this.session.currentLevelIndex = 0;
-      this._loadLevelAtIndex(this.session.currentLevelIndex);
-      this.states.setState('playing');
-      this._focusPlay();
+      this._runLevelLoadDeferred(this.session.currentLevelIndex, () => {
+        this.states.setState('playing');
+        this._focusPlay();
+      });
     });
 
     this.queue.register('LOAD_LEVEL', (payload) => {
       if (!payload || typeof payload.index !== 'number') return;
-      this._loadLevelAtIndex(payload.index);
-      this.states.setState('playing');
-      this._focusPlay();
+      this._runLevelLoadDeferred(payload.index, () => {
+        this.states.setState('playing');
+        this._focusPlay();
+      });
     });
 
     this.queue.register('RESTART_LEVEL', () => {
@@ -282,9 +274,10 @@ export class GameApplication {
       const next = this.session.currentLevelIndex + 1;
       if (infinite || next < count) {
         this.session.currentLevelIndex = next;
-        this._loadLevelAtIndex(this.session.currentLevelIndex);
-        this.states.setState('playing');
-        this._focusPlay();
+        this._runLevelLoadDeferred(this.session.currentLevelIndex, () => {
+          this.states.setState('playing');
+          this._focusPlay();
+        });
       } else {
         this.session.currentLevelIndex = 0;
         this.levelLoader.clear(this.physics.world, this.scene);
@@ -360,6 +353,29 @@ export class GameApplication {
     this.canvas?.focus();
   }
 
+  /**
+   * Yields two animation frames so the browser can paint a loading state before heavy procgen / mesh build.
+   * @param {number} index
+   * @param {() => void} [done]
+   */
+  _runLevelLoadDeferred(index, done) {
+    this.ui.setLevelLoading(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          const t0 = performance.now();
+          this._loadLevelAtIndex(index);
+          console.log(`[level] index ${index} loaded in ${(performance.now() - t0).toFixed(1)}ms (procgen + meshes)`);
+        } catch (err) {
+          console.error('[level] load failed', err);
+        } finally {
+          this.ui.setLevelLoading(false);
+        }
+        done?.();
+      });
+    });
+  }
+
   _resetCameraOrbit() {
     this._cameraYaw = ControlSettings.camera.initialYaw;
     this._cameraPitch = ControlSettings.camera.initialPitch;
@@ -380,7 +396,9 @@ export class GameApplication {
     if (!descriptor) return;
 
     this.levelLoader.clear(this.physics.world, this.scene);
+    const tBuild = performance.now();
     const built = this.levelLoader.build(this.physics.world, this.scene, this._materials, descriptor);
+    console.log(`[level] LevelLoader.build ${(performance.now() - tBuild).toFixed(1)}ms`);
     this._spawn = /** @type {[number, number, number]} */ ([
       descriptor.spawn[0],
       descriptor.spawn[1],

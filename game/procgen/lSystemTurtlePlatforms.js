@@ -1,6 +1,7 @@
 /**
  * Interprets an L-system string as a 2.5D turtle: `F`/`G` lay flat tiles, `r` lays a sloped ramp
- * (rise + forward), `^` / `v` adjust deck height, `+` / `-` turn, `[` / `]` branch.
+ * (rise + forward), `^` / `v` adjust deck height, `j` advances forward one step **without** a tile
+ * (jump gap), `+` / `-` turn, `[` / `]` branch.
  *
  * Documentation: **PROCEDURAL_L_SYSTEM_LEVELS.md** (§4–5); **LEVEL_DESIGN_AND_PROCEDURE.md** (§3 affordances, §7 traversal).
  */
@@ -66,6 +67,12 @@ export function turtleBuildPlatforms(str, params) {
   for (let i = 0; i < str.length; i++) {
     const c = str[i];
     switch (c) {
+      case 'j': {
+        x += step * Math.sin(yaw);
+        z += step * Math.cos(yaw);
+        trackBounds(x, z);
+        break;
+      }
       case 'F':
       case 'G':
         x += step * Math.sin(yaw);

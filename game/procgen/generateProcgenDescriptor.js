@@ -31,6 +31,8 @@ import {
   widenPlatforms,
 } from './postProcessProcgen.js';
 import { buildSpineFromDrunkardGrid } from './gridSpinePipeline.js';
+import { injectJumpSplitsInSpine } from './injectJumpSplitsInSpine.js';
+import { procgenLogInfo } from './procgenLog.js';
 
 /** Marble radius matches PhysicsSystem default; pad is slightly wider than marble. */
 const ZONE_RADIUS = 0.62;
@@ -41,14 +43,19 @@ const ZONE_SURFACE_Y = 0.04;
  * @returns {object} Level descriptor for `LevelLoader.build`
  */
 export function generateProcgenDescriptor(levelIndex) {
+  const tAll = performance.now();
   const iterations = procgenLSystemIterations(levelIndex);
   const step = procgenTurtleStep(levelIndex);
   const pg = GameplaySettings.procgen;
   const verticalStep = pg.verticalStep;
   const jumpClearance = pg.jumpClearance;
 
+  const tGrid0 = performance.now();
   const gridBundle = buildSpineFromDrunkardGrid(levelIndex, pg);
+  const gridMs = performance.now() - tGrid0;
   let core = gridBundle.spine;
+  const injected = injectJumpSplitsInSpine(core, levelIndex, pg);
+  core = injected.spine;
   const angleRad = gridBundle.angleRad;
 
   const maxRepair = pg.comptonRhythmRepairMaxPasses;
@@ -61,6 +68,7 @@ export function generateProcgenDescriptor(levelIndex) {
   let built;
   let lastAudit = { ok: true, maxGapXZ: 0, failIndex: -1 };
 
+  const tTurtle0 = performance.now();
   while (true) {
     let e = preferRampsOverStepJumps(core, levelIndex);
     beforeSplices = e;
@@ -81,6 +89,7 @@ export function generateProcgenDescriptor(levelIndex) {
     core += 'F'.repeat(2 + repairPasses);
     repairPasses++;
   }
+  const turtleMs = performance.now() - tTurtle0;
 
   const stepsPerSplice = Math.max(
     2,
@@ -92,6 +101,7 @@ export function generateProcgenDescriptor(levelIndex) {
       ? Math.round(spliceInsertChars / stepsPerSplice)
       : 0;
 
+  const tPost0 = performance.now();
   let staticEntries = widenPlatforms(built.static, levelIndex);
   staticEntries = applySegmentStyles(staticEntries, levelIndex);
   const obstacleResult = placeObstacles(staticEntries, levelIndex, beforeSplices.length);
@@ -108,6 +118,22 @@ export function generateProcgenDescriptor(levelIndex) {
   );
 
   const killPlaneY = computeKillPlaneY(offset.static);
+  const postMs = performance.now() - tPost0;
+  const totalMs = performance.now() - tAll;
+
+  procgenLogInfo(`level ${levelIndex} descriptor ready`, {
+    totalMs: Number(totalMs.toFixed(2)),
+    gridMs: Number(gridMs.toFixed(2)),
+    turtleAndConnectivityMs: Number(turtleMs.toFixed(2)),
+    postProcessMs: Number(postMs.toFixed(2)),
+    gridAttempts: gridBundle.gridAttempts,
+    jumpSplits: injected.jumpSplitCount,
+    repairPasses,
+    spineLength: expanded.length,
+    staticBoxes: offset.static.length,
+    connectivityOk: lastAudit.ok,
+    maxGapXZ: lastAudit.maxGapXZ,
+  });
 
   const displayName = String(levelIndex + 1);
 
@@ -136,6 +162,7 @@ export function generateProcgenDescriptor(levelIndex) {
         pathCells: gridBundle.plan.main.length,
         maxDist: gridBundle.plan.maxDist,
         goalCell: gridBundle.plan.goalCell,
+        jumpSplits: injected.jumpSplitCount,
       },
       rhythmRepairPasses: repairPasses,
       connectivityOk: lastAudit.ok,

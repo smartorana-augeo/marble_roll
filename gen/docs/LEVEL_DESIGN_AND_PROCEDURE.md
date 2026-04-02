@@ -39,7 +39,7 @@ flowchart TB
   PLSL -->|normative for| Code
 ```
 
-**Implementation traceability:** `game/procgen/*.js`, `GameplaySettings.procgen` in `game/config/GameplaySettings.js`, `LevelLoader`, and `loadRoadTextures` include file-level comments linking **this document**, **PROCEDURAL_L_SYSTEM_LEVELS.md**, and **THE_LADDER.md** (see also the code ↔ docs map in **PROCEDURAL_L_SYSTEM_LEVELS.md** §2).
+**Implementation traceability:** `game/procgen/*.js`, `GameplaySettings.procgen` in `game/config/GameplaySettings.js`, and `LevelLoader` link **this document**, **PROCEDURAL_L_SYSTEM_LEVELS.md**, and **THE_LADDER.md** (see also the code ↔ docs map in **PROCEDURAL_L_SYSTEM_LEVELS.md** §2).
 
 ---
 

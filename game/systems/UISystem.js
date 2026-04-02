@@ -17,6 +17,24 @@ export class UISystem {
     this.btnContinue = document.getElementById('btn-continue');
     this.marbleDead = document.getElementById('screen-marble-dead');
     this.btnTryAgain = document.getElementById('btn-try-again');
+    this.loadingOverlay = document.getElementById('loading-overlay');
+    this.loadingOverlayText = document.getElementById('loading-overlay-text');
+  }
+
+  /**
+   * Shown while procedural generation / level build runs (can take hundreds of ms).
+   * @param {boolean} visible
+   * @param {string} [message]
+   */
+  setLevelLoading(visible, message = 'Generating level…') {
+    if (this.loadingOverlayText && message) {
+      this.loadingOverlayText.textContent = message;
+    }
+    if (this.loadingOverlay) {
+      this.loadingOverlay.hidden = !visible;
+    }
+    if (this.btnNewGame) this.btnNewGame.disabled = visible;
+    if (this.btnContinue) this.btnContinue.disabled = visible;
   }
 
   showMenu() {

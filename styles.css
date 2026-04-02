@@ -199,3 +199,31 @@ body {
 .hud[hidden] {
   display: none;
 }
+
+/** Shown during procedural generation so the UI does not look frozen. */
+.loading-overlay {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #e8eef4;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.loading-overlay[hidden] {
+  display: none !important;
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}

@@ -1,9 +1,6 @@
 import { Body, Box, Vec3 } from 'cannon-es';
 import * as THREE from 'three';
 
-/** Straight / plaza meshes in the road pack are authored at roughly this span (world units). */
-const ROAD_TEXTURE_TILE_UNITS = 12;
-
 /**
  * Builds static level geometry for cannon-es and Three.js; supports teardown.
  * Supports optional `zones` (flat disc markers) instead of a single spherical goal.
@@ -58,7 +55,7 @@ export class LevelLoader {
   /**
    * @param {import('cannon-es').World} world
    * @param {THREE.Scene} scene
-   * @param {{ static: THREE.MeshStandardMaterial, goal: THREE.MeshStandardMaterial, zoneStart?: THREE.MeshStandardMaterial, zoneEnd?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial, roadStraight?: THREE.Texture, roadPlaza?: THREE.Texture }} materials
+   * @param {{ static: THREE.MeshStandardMaterial, goal: THREE.MeshStandardMaterial, zoneStart?: THREE.MeshStandardMaterial, zoneEnd?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial, plaza?: THREE.MeshStandardMaterial, path?: THREE.MeshStandardMaterial, pathWide?: THREE.MeshStandardMaterial, ramp?: THREE.MeshStandardMaterial }} materials
    * @param {object} descriptor
    */
   build(world, scene, materials, descriptor) {
@@ -145,56 +142,14 @@ export class LevelLoader {
   }
 
   /**
-   * @param {{ static: THREE.MeshStandardMaterial, plaza?: THREE.MeshStandardMaterial, path?: THREE.MeshStandardMaterial, pathWide?: THREE.MeshStandardMaterial, ramp?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial, roadStraight?: THREE.Texture, roadPlaza?: THREE.Texture }} materials
+   * @param {{ static: THREE.MeshStandardMaterial, plaza?: THREE.MeshStandardMaterial, path?: THREE.MeshStandardMaterial, pathWide?: THREE.MeshStandardMaterial, ramp?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial }} materials
    * @param {object} entry
-   * @param {number} hx
-   * @param {number} hz
-   * @returns {THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]}
+   * @param {number} _hx
+   * @param {number} _hz
+   * @returns {THREE.MeshStandardMaterial}
    */
-  static _meshMaterialForBox(materials, entry, hx, hz) {
-    const road = LevelLoader._roadFaceMaterialsIfAvailable(materials, entry, hx, hz);
-    if (road) return road;
+  static _meshMaterialForBox(materials, entry, _hx, _hz) {
     return LevelLoader._materialForSegment(materials, entry);
-  }
-
-  /**
-   * Six materials: +X, -X, +Y (walkable top), -Y, +Z, -Z (Three.js box face order).
-   * @param {{ roadStraight?: THREE.Texture, roadPlaza?: THREE.Texture }} materials
-   * @param {object} entry
-   * @param {number} hx
-   * @param {number} hz
-   * @returns {THREE.MeshStandardMaterial[] | null}
-   */
-  static _roadFaceMaterialsIfAvailable(materials, entry, hx, hz) {
-    const texBase = materials.roadStraight;
-    if (!texBase) return null;
-
-    const k = entry.materialKey;
-    const plazaTex = materials.roadPlaza ?? texBase;
-    const source = k === 'plaza' ? plazaTex : texBase;
-    const topMap = source.clone();
-    topMap.repeat.set((2 * hx) / ROAD_TEXTURE_TILE_UNITS, (2 * hz) / ROAD_TEXTURE_TILE_UNITS);
-    topMap.offset.set(0, 0);
-    topMap.needsUpdate = true;
-
-    const top = new THREE.MeshStandardMaterial({
-      map: topMap,
-      roughness: 0.78,
-      metalness: 0.05,
-    });
-    if (k === 'ramp') {
-      top.color.setHex(0xb8e8d0);
-    }
-
-    const sideColour =
-      k === 'plaza' ? 0x2a2620 : k === 'ramp' ? 0x1e2a24 : 0x222222;
-    const side = new THREE.MeshStandardMaterial({
-      color: sideColour,
-      roughness: 0.88,
-      metalness: 0.04,
-    });
-
-    return [side, side, top, side, side, side];
   }
 
   /**

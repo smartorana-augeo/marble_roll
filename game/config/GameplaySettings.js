@@ -38,6 +38,7 @@
  * @property {number} comptonRhythmRepairMaxPasses When the audit fails, append forward symbols to the core and rebuild (capped).
  * @property {object} grid Drunkard-walk grid sizing and behaviour — see `gen/docs/PROCEDURAL_DRUNKARD_GRID_SPEC.md`.
  * @property {object} gridToSpine Emission: leading `F` run-up and **90°** turns for grid layouts.
+ * @property {object} gridJumps `^`/`v` + `j` gap injection along the spine; spacing tightens with `levelIndex`.
  */
 
 export const GameplaySettings = {
@@ -110,6 +111,21 @@ export const GameplaySettings = {
       leadingFCount: 1,
       /** Use **π/2** rad per `+`/`−` so grid edges match cardinal moves. */
       useRightAngle: true,
+    },
+
+    /**
+     * Jump splits: before some `F` symbols, insert `^j` or `vj` (one forward gap `j`, small height change).
+     * Higher levels → smaller spacing between splits and more splits total.
+     */
+    gridJumps: {
+      firstSplitF: 8,
+      spacingMin: 4,
+      spacingBase: 22,
+      spacingLevelCap: 18,
+      spacingPerLevel: 1,
+      maxSplitsCap: 28,
+      maxSplitsBase: 4,
+      maxSplitsPerLevel: 0.85,
     },
   },
 };

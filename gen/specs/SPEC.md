@@ -189,10 +189,10 @@ Held in a single **session** object (name may vary), including at least:
 **Normative for the current implementation** (`marble_roll`):
 
 - **Design layer:** For *why* courses are shaped and how obstacles are thought about, see **`gen/docs/LEVEL_DESIGN_AND_PROCEDURE.md`**. For the exact **L-system pipeline** and descriptor fields, see **`gen/docs/PROCEDURAL_L_SYSTEM_LEVELS.md`**.
-- **Separation:** Procedural **geometry** is defined entirely in **`game/procgen/`** (`generateProcgenDescriptor` → static box list with **`materialKey`**). The generator builds a **single main forward path** (spine), then **splices** vertical offsets from rung 2 onward; **road texturing** does **not** affect layout; it only affects **Three.js** materials inside **`LevelLoader`** and **`GameApplication`** bootstrap.
-- **Bootstrap:** After **`levels.json`** loads, **`GameApplication`** may **`loadRoadTextures()`** (`game/level/loadRoadTextures.js`), resolving **`assets/road/Road1_B.png`** and **`Road6_B.png`** via **`import.meta.url`**. Success attaches **`roadStraight`** / **`roadPlaza`** on the shared materials object passed to **`LevelLoader.build`**; failure keeps **flat** `MeshStandardMaterial` segment colours (gameplay unchanged).
-- **Build-time:** For each **non-lattice** box, if **`roadStraight`** is set, **`LevelLoader`** uses a **multi-material box** with a **textured +Y (top) face** (walkable surface in mesh space, including sloped **`ramp`** segments) and solid **side** materials; **`lattice`** and **zones** are unaffected.
-- **Specification detail:** `gen/docs/PROCEDURAL_L_SYSTEM_LEVELS.md` §5.8 — **repeat scale**, **asset filenames**, and **determinism** (textures do not affect layout).
+- **Separation:** Procedural **geometry** is defined entirely in **`game/procgen/`** (`generateProcgenDescriptor` → static box list with **`materialKey`**). The generator builds a **drunkard-grid** spine, injects **jump splits** (`^`/`v` + gap symbol **`j`**), then runs the turtle and post-processes. **Presentation** uses flat **`MeshStandardMaterial`** segment colours in **`LevelLoader`** (no diffuse road textures).
+- **Bootstrap:** After **`levels.json`** loads, **`GameApplication`** prepares **Three.js** materials once; no texture fetch is required for track surfaces.
+- **Build-time:** Each **non-lattice** box uses a single material from **`materialKey`** (`plaza`, `path`, `pathWide`, `ramp`, or fallback **`static`**); **`lattice`** and **zones** use their own materials.
+- **Specification detail:** `gen/docs/PROCEDURAL_L_SYSTEM_LEVELS.md` — turtle alphabet includes **`j`** (forward gap); see **`GameplaySettings.procgen.gridJumps`** for split spacing vs level index.
 
 ---
 
@@ -297,7 +297,7 @@ Not normative for runtime behaviour, but aligns with this spec:
 
 - `index.html` — import map, single `type="module"` script.
 - `main.js` — constructs and starts the application.
-- `game/` — `GameApplication`, `GameLoop`, `FrameCommandQueue`, `states/`, `systems/`, `config/` (`ControlSettings.js`, **`GameplaySettings.js`** — procgen path width and related tuning), `level/LevelLoader.js`, `level/loadRoadTextures.js`, `procgen/` (L-system pipeline).
+- `game/` — `GameApplication`, `GameLoop`, `FrameCommandQueue`, `states/`, `systems/`, `config/` (`ControlSettings.js`, **`GameplaySettings.js`** — procgen tuning), `level/LevelLoader.js`, `procgen/` (grid pipeline, jump injection, turtle).
 - `levels/levels.json` — level bundle.
 - `assets/road/` — optional **PNG** diffuse maps for track segments (`Road1_B.png`, `Road6_B.png`).
 - `styles.css` — global and overlay styles.

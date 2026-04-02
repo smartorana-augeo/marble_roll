@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Marble roll</title>
-  <link rel="stylesheet" href="styles.css?v=20260329g">
+  <link rel="stylesheet" href="styles.css?v=20260401a">
   <script type="importmap">
   {
     "imports": {
@@ -23,30 +23,37 @@
     <canvas id="game-canvas" tabindex="0"></canvas>
     <div id="ui-root" aria-live="polite">
       <div id="screen-menu" class="screen screen--visible">
-        <h1 id="menu-heading"></h1>
-        <p class="menu-subtitle" id="menu-subtitle"></p>
-        <p class="hint" id="menu-hint"></p>
-        <p class="keys" id="menu-keys"></p>
+        <h1 id="menu-heading">Marble roll</h1>
+        <p class="menu-subtitle" id="menu-subtitle">3D physics marble</p>
+        <p class="hint" id="menu-hint">
+          Roll to the gold goal. Touch the green start pad first. Courses have gaps and small height changes you can jump — harder on later levels. Each level is generated at load and can take a moment.
+        </p>
+        <p class="keys" id="menu-keys">
+          <strong>Move</strong> WASD or arrows · <strong>Jump</strong> Space · <strong>Brake</strong> Shift · <strong>Camera</strong> arrow keys (orbit) · <strong>Restart</strong> R
+        </p>
         <div class="menu-actions">
           <label class="dev-mode-label">
             <input type="checkbox" id="dev-mode" />
-            Dev mode
+            Dev mode (skip level)
           </label>
-          <button type="button" id="btn-new-game" class="btn-primary"></button>
+          <button type="button" id="btn-new-game" class="btn-primary">New game</button>
         </div>
         <p class="menu-build" title="If this line is missing, the browser or server is not loading this folder’s index.html">
-          Build 20260329g — marble player; assets via AssetSettings
+          WebGL + cannon-es · procgen grid + jump splits · build 20260401b
         </p>
       </div>
+      <div id="loading-overlay" class="loading-overlay" hidden aria-busy="true" aria-live="polite">
+        <p id="loading-overlay-text">Generating level…</p>
+      </div>
       <div id="screen-marble-dead" class="screen" hidden>
-        <h2 id="death-heading"></h2>
-        <p class="hint" id="death-hint"></p>
-        <button type="button" id="btn-try-again" class="btn-primary"></button>
+        <h2 id="death-heading">Out of bounds</h2>
+        <p class="hint" id="death-hint">You fell too far. Press the button or R to try again.</p>
+        <button type="button" id="btn-try-again" class="btn-primary">Try again</button>
       </div>
       <div id="screen-level-complete" class="screen" hidden>
         <h2 id="level-complete-title">Level complete</h2>
         <p id="level-complete-msg" class="hint">Press Enter to continue.</p>
-        <button type="button" id="btn-continue" class="btn-primary"></button>
+        <button type="button" id="btn-continue" class="btn-primary">Next level</button>
       </div>
       <div id="hud" class="hud" hidden>
         <span id="hud-level-name"></span>
@@ -56,6 +63,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="main.js?v=20260329g"></script>
+  <script type="module" src="main.js?v=20260401b"></script>
 </body>
 </html>
