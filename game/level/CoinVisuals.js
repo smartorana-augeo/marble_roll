@@ -16,7 +16,7 @@ export function addCoinMeshes(scene, materials, coins) {
     return { entries: [], geometry: null };
   }
 
-  const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.14, 28);
+  const geometry = new THREE.CylinderGeometry(0.4, 0.4, 0.14, 32);
   const mat = materials.coin;
   /** @type {{ id: string, mesh: THREE.Mesh }[]} */
   const entries = [];

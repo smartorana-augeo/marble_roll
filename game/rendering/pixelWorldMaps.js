@@ -58,12 +58,14 @@ const WORLD_KEYS = [
 /**
  * One shared noise texture for platform marble/coin materials — cyber “pixel world” grain.
  * @param {Record<string, THREE.MeshStandardMaterial>} materials
+ * @param {{ noiseTextureSize?: number }} [overrides] e.g. lower size from `PerformanceSettings`
  * @returns {THREE.DataTexture | null}
  */
-export function applyPixelWorldMapsToMaterials(materials) {
+export function applyPixelWorldMapsToMaterials(materials, overrides = {}) {
   const w = VisualSettings.world3d;
   if (!w.pixelNoiseEnabled) return null;
-  const tex = createPixelNoiseTexture(w.noiseTextureSize, 0x3d437c29, w.roughnessNoiseAmplitude);
+  const noiseSize = overrides.noiseTextureSize ?? w.noiseTextureSize;
+  const tex = createPixelNoiseTexture(noiseSize, 0x3d437c29, w.roughnessNoiseAmplitude);
   tex.repeat.set(w.textureRepeat, w.textureRepeat);
   tex.needsUpdate = true;
   for (const key of WORLD_KEYS) {

@@ -23,7 +23,7 @@ export const DisplaySettings = {
    * Shown only on the start-screen key list — not in the in-game HUD legend.
    * @type {ReadonlyArray<{ action: string, keys: string }>}
    */
-  menuOnlyControlBindings: Object.freeze([{ action: 'Mute', keys: 'M' }]),
+  menuOnlyControlBindings: Object.freeze([{ action: 'Play/mute', keys: 'M' }]),
 };
 
 /**

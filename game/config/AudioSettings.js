@@ -4,12 +4,12 @@
 
 export const AudioSettings = Object.freeze({
   /**
-   * Bumped when default behaviour should apply to everyone again (e.g. default = music on).
-   * Absent key ⇒ not muted.
+   * Bumped when default behaviour should apply to everyone again (e.g. default = muted).
+   * Absent key ⇒ use `defaultMuted`.
    */
   storageKey: 'marble_roll_music_muted_v2',
-  /** When no preference is stored, music plays (unmuted). */
-  defaultMuted: false,
+  /** When no preference is stored, music starts muted (user unmutes with M or the control). */
+  defaultMuted: true,
 });
 
 /**

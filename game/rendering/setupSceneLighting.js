@@ -5,9 +5,10 @@ import * as THREE from 'three';
  *
  * @param {THREE.Scene} scene
  * @param {import('../config/SceneLightingSettings.js').SceneLightingSettingsShape} config
+ * @param {{ shadowMapSize?: number }} [perf] optional overrides (see `PerformanceSettings`)
  * @returns {{ hemisphere: THREE.HemisphereLight, directional: THREE.DirectionalLight, ambient: THREE.AmbientLight | null }}
  */
-export function setupSceneLighting(scene, config) {
+export function setupSceneLighting(scene, config, perf = {}) {
   const f = config.fog;
   scene.fog = new THREE.Fog(f.color, f.near, f.far);
 
@@ -30,7 +31,8 @@ export function setupSceneLighting(scene, config) {
   directional.castShadow = d.castShadow !== false;
   if (directional.castShadow && d.shadow) {
     const sc = d.shadow;
-    directional.shadow.mapSize.set(sc.mapSize, sc.mapSize);
+    const mapSize = typeof perf.shadowMapSize === 'number' ? perf.shadowMapSize : sc.mapSize;
+    directional.shadow.mapSize.set(mapSize, mapSize);
     if (typeof sc.radius === 'number') {
       directional.shadow.radius = sc.radius;
     }

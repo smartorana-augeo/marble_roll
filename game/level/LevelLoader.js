@@ -123,7 +123,7 @@ export class LevelLoader {
       };
     } else if (descriptor.goal) {
       const g = descriptor.goal;
-      const goalGeo = new THREE.SphereGeometry(g.radius, 24, 18);
+      const goalGeo = new THREE.SphereGeometry(g.radius, 28, 22);
       const goalMat = materials.goal;
       this._goalMarker = new THREE.Mesh(goalGeo, goalMat);
       this._goalMarker.position.set(g.position[0], g.position[1], g.position[2]);

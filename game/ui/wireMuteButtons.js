@@ -11,20 +11,20 @@ export function wireMuteButtons(music) {
 
   function syncButtons() {
     const muted = music.isMuted();
-    const tipText = muted ? 'Unmute' : 'Mute';
+    const tipText = muted ? 'Play' : 'Mute';
     /** ASCII: sound on `|>`, muted `|x` */
     const icon = muted ? '|x' : '|>';
 
     if (menuBtn) {
       menuBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      menuBtn.setAttribute('aria-label', muted ? 'Unmute music' : 'Mute music');
+      menuBtn.setAttribute('aria-label', muted ? 'Play music' : 'Mute music');
       const label = menuBtn.querySelector('.btn-mute__label');
       if (label) label.textContent = icon;
       if (menuTip) menuTip.textContent = tipText;
     }
     if (hudBtn) {
       hudBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      hudBtn.setAttribute('aria-label', muted ? 'Unmute music' : 'Mute music');
+      hudBtn.setAttribute('aria-label', muted ? 'Play music' : 'Mute music');
       const label = hudBtn.querySelector('.btn-mute__label');
       if (label) label.textContent = icon;
       if (hudTip) hudTip.textContent = tipText;

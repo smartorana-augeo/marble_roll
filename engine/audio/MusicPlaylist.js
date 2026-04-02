@@ -2,7 +2,26 @@
  * HTML5 Audio playlist: plays tracks in order; each track plays once, then advances.
  * Not tied to game level — volume is either off (muted) or 1.
  * No DOM; game layer supplies URLs and persistence callbacks.
+ *
+ * Browsers block `HTMLMediaElement.play()` until the user has interacted with the page
+ * (NotAllowedError). That is expected on boot; we load the first track and stay quiet until
+ * {@link ensurePlayback} runs after a gesture.
  */
+
+/**
+ * @param {string | undefined} url
+ * @returns {string}
+ */
+function _shortUrlForLog(url) {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    return parts.length ? parts.slice(-2).join('/') : u.href;
+  } catch {
+    return url.length > 72 ? `…${url.slice(-72)}` : url;
+  }
+}
 
 export class MusicPlaylist {
   /**
@@ -30,7 +49,9 @@ export class MusicPlaylist {
     });
 
     this._audio.addEventListener('loadeddata', () => {
-      console.log('[music] loaded', this._audio.src?.slice(-56));
+      if (typeof console !== 'undefined' && console.debug) {
+        console.debug('[music] loaded', _shortUrlForLog(this._audio.src));
+      }
     });
 
     this._audio.addEventListener('error', () => {
@@ -94,7 +115,9 @@ export class MusicPlaylist {
     }
     this._loadedUrlIndex = idx;
     this._audio.src = this._urls[idx];
-    console.log('[music] track', idx, this._urls[idx]?.slice(-56));
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('[music] track', idx, _shortUrlForLog(this._urls[idx]));
+    }
     this._audio.load();
     this._applyVolumeToElement();
     void this._tryPlay();
@@ -115,11 +138,15 @@ export class MusicPlaylist {
     try {
       const wasPaused = this._audio.paused;
       await this._audio.play();
-      if (wasPaused) {
-        console.log('[music] playing', { track: this._loadedUrlIndex, muted: this._muted });
+      if (wasPaused && typeof console !== 'undefined' && console.debug) {
+        console.debug('[music] playing', { track: this._loadedUrlIndex, muted: this._muted });
       }
     } catch (err) {
-      console.warn('[music] play() blocked or failed — interact with the page (e.g. mute button)', err);
+      const name = err && typeof err === 'object' && 'name' in err ? err.name : '';
+      if (name === 'NotAllowedError') {
+        return;
+      }
+      console.warn('[music] play() failed', err);
     }
   }
 

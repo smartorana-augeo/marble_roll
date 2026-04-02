@@ -10,6 +10,7 @@ export class PhysicsSystem {
     this.world = new World({
       gravity: new Vec3(0, -28, 0),
     });
+    this.world.allowSleep = true;
     /** @type {import('cannon-es').Body | null} */
     this.marbleBody = null;
     /** Marble collision radius (world units); must match visual mesh. */

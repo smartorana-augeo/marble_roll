@@ -1,6 +1,7 @@
 import { applyVisualSettingsToDom } from './game/config/VisualSettings.js';
 import { GameApplication } from './game/GameApplication.js';
 import { isWebGLAvailable } from './game/embed/EmbedHost.js';
+import { flowLog } from './game/util/flowLog.js';
 
 applyVisualSettingsToDom();
 
@@ -15,7 +16,7 @@ if (!isWebGLAvailable()) {
   application
     .start()
     .then(() => {
-      console.log('[marble:flow] start() finished — menu should be live; try New game.');
+      flowLog('[marble:flow] start() finished — menu should be live; try New game.');
     })
     .catch((err) => {
       console.error('[marble:flow] start() failed', err);

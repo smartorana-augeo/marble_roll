@@ -7,6 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>nova roll</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23711c91'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ea00d9'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
@@ -40,7 +41,7 @@
             <span class="keys__line"><strong class="keys__action">Brake</strong><span class="keys__binding">Shift</span></span>
             <span class="keys__line"><strong class="keys__action">Camera</strong><span class="keys__binding">arrows</span></span>
             <span class="keys__line"><strong class="keys__action">Restart</strong><span class="keys__binding">R</span></span>
-            <span class="keys__line"><strong class="keys__action">Mute</strong><span class="keys__binding">M</span></span>
+            <span class="keys__line"><strong class="keys__action">Play/mute</strong><span class="keys__binding">M</span></span>
           </p>
           <div class="menu-actions">
             <button type="button" id="btn-new-game" class="btn-primary btn-primary--cyber btn-primary--glitch">
@@ -64,13 +65,13 @@
             type="button"
             id="btn-menu-music-mute"
             class="btn-mute btn-mute--menu-corner"
-            aria-pressed="false"
-            aria-label="Mute music"
+            aria-pressed="true"
+            aria-label="Play music"
             aria-describedby="tooltip-menu-mute"
           >
-            <span class="btn-mute__label" aria-hidden="true">|&gt;</span>
+            <span class="btn-mute__label" aria-hidden="true">|x</span>
           </button>
-          <span id="tooltip-menu-mute" class="btn-mute__tooltip" role="tooltip">Mute</span>
+          <span id="tooltip-menu-mute" class="btn-mute__tooltip" role="tooltip">Play</span>
         </span>
       </div>
       <div
@@ -157,13 +158,13 @@
                   type="button"
                   id="btn-hud-music-mute"
                   class="btn-mute"
-                  aria-pressed="false"
-                  aria-label="Mute music"
+                  aria-pressed="true"
+                  aria-label="Play music"
                   aria-describedby="tooltip-hud-mute"
                 >
-                  <span class="btn-mute__label" aria-hidden="true">|&gt;</span>
+                  <span class="btn-mute__label" aria-hidden="true">|x</span>
                 </button>
-                <span id="tooltip-hud-mute" class="btn-mute__tooltip" role="tooltip">Mute</span>
+                <span id="tooltip-hud-mute" class="btn-mute__tooltip" role="tooltip">Play</span>
               </span>
             </div>
             <div id="dev-bypass-wrap" class="dev-bypass-wrap" hidden>
