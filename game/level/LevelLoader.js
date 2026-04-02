@@ -1,5 +1,6 @@
 import { Body, Box, Vec3 } from 'cannon-es';
 import * as THREE from 'three';
+import { addCoinMeshes } from './CoinVisuals.js';
 
 /**
  * Builds static level geometry for cannon-es and Three.js; supports teardown.
@@ -18,6 +19,10 @@ export class LevelLoader {
     this._goalMarker = null;
     /** @type {THREE.Mesh[]} */
     this._zoneMeshes = [];
+    /** @type {THREE.BufferGeometry | null} */
+    this._coinGeometry = null;
+    /** @type {{ id: string, mesh: THREE.Mesh }[]} */
+    this._coinEntries = [];
   }
 
   /**
@@ -47,6 +52,14 @@ export class LevelLoader {
       } else this._goalMarker.material?.dispose?.();
       this._goalMarker = null;
     }
+    for (const { mesh } of this._coinEntries) {
+      scene.remove(mesh);
+    }
+    this._coinEntries = [];
+    if (this._coinGeometry) {
+      this._coinGeometry.dispose();
+      this._coinGeometry = null;
+    }
     this._staticBodies = [];
     this._meshes = [];
     this._zoneMeshes = [];
@@ -55,7 +68,7 @@ export class LevelLoader {
   /**
    * @param {import('cannon-es').World} world
    * @param {THREE.Scene} scene
-   * @param {{ static: THREE.MeshStandardMaterial, goal: THREE.MeshStandardMaterial, zoneStart?: THREE.MeshStandardMaterial, zoneEnd?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial, plaza?: THREE.MeshStandardMaterial, path?: THREE.MeshStandardMaterial, pathWide?: THREE.MeshStandardMaterial, ramp?: THREE.MeshStandardMaterial }} materials
+   * @param {{ static: THREE.MeshStandardMaterial, goal: THREE.MeshStandardMaterial, coin?: THREE.MeshStandardMaterial, zoneStart?: THREE.MeshStandardMaterial, zoneEnd?: THREE.MeshStandardMaterial, lattice?: THREE.MeshStandardMaterial, plaza?: THREE.MeshStandardMaterial, path?: THREE.MeshStandardMaterial, pathWide?: THREE.MeshStandardMaterial, ramp?: THREE.MeshStandardMaterial }} materials
    * @param {object} descriptor
    */
   build(world, scene, materials, descriptor) {
@@ -121,10 +134,17 @@ export class LevelLoader {
       };
     }
 
+    const coinList = Array.isArray(descriptor.coins) ? descriptor.coins : [];
+    const coinMat = materials.coin ?? materials.goal;
+    const coinBundle = addCoinMeshes(scene, { coin: coinMat }, coinList);
+    this._coinGeometry = coinBundle.geometry;
+    this._coinEntries = coinBundle.entries;
+
     return {
       spawn: descriptor.spawn,
       goal,
       zones: hasZones ? descriptor.zones : null,
+      coinEntries: coinBundle.entries,
     };
   }
 

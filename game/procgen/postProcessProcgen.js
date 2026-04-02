@@ -8,6 +8,7 @@ import {
   GameplaySettings,
   procgenMinPlatformHalfXZ,
   procgenPathHalfXZBase,
+  procgenTurtleStep,
 } from '../config/GameplaySettings.js';
 
 const { minStaticCountForGap } = GameplaySettings.procgen;
@@ -58,7 +59,8 @@ export function applySegmentStyles(staticEntries, levelIndex) {
 
     if (e.materialKey === 'ramp') {
       const w = pathHalfXZ(levelIndex, i);
-      return { ...e, halfExtents: [Math.max(minXZ, w), hy, hz] };
+      const wx = clampPathHalfXZToTurtleStep(Math.max(minXZ, w), levelIndex);
+      return { ...e, halfExtents: [wx, hy, hz] };
     }
 
     if (i === 0) {
@@ -73,10 +75,12 @@ export function applySegmentStyles(staticEntries, levelIndex) {
     const h2 = (levelIndex * 7919 + i * 13) >>> 0;
     const wide =
       h2 % 9 === 0 ? Math.min(p.pathWideCap, w + p.pathWideDelta) : w;
+    const wideGrounded = Math.max(minXZ, wide);
+    const wideClamped = clampPathHalfXZToTurtleStep(wideGrounded, levelIndex);
     const key = wide > wideThreshold ? 'pathWide' : 'path';
     return {
       ...e,
-      halfExtents: [wide, hy, wide],
+      halfExtents: [wideClamped, hy, wideClamped],
       materialKey: key,
     };
   });
@@ -93,6 +97,17 @@ function pathHalfXZ(levelIndex, pathIndex) {
   const h = (levelIndex * 1103515245 + pathIndex * 12345) >>> 0;
   const span = p.pathHalfXZSpanMin + (h % p.pathHalfXZSpanSteps) * p.pathHalfXZSpanStep;
   return base + span;
+}
+
+/**
+ * Caps horizontal half-extent so consecutive axis-aligned slabs (centre spacing ≈ turtle step)
+ * do not overlap in XZ — avoids z-fighting shimmer on deck tops.
+ */
+function clampPathHalfXZToTurtleStep(halfXZ, levelIndex) {
+  const step = procgenTurtleStep(levelIndex);
+  const f =
+    GameplaySettings.procgen.pathHalfXZClampStepFactor ?? 0.485;
+  return Math.min(halfXZ, step * f);
 }
 
 /**

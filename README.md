@@ -36,3 +36,30 @@ npx --yes serve -p 8765
 Then open [http://localhost:8765/](http://localhost:8765/) in your browser.
 
 To stop the server, press `Ctrl+C` in the terminal.
+
+## Embedding (Encore / Grove / iframes)
+
+The game can sit in an `<iframe>` on your site. It uses **WebGL**; the host page must allow accelerated canvas (no blanket canvas fingerprint blocking).
+
+**Query parameters**
+
+| Parameter | Meaning |
+|-----------|---------|
+| `embed=1` | Enables embed behaviour (also auto-enabled when `window.self !== window.top`). Adds `body.embed` (hides dev controls and build line). |
+| `session_uid=…` | Passed through on `postMessage` payloads (same idea as Drimify `session_uid`). |
+| `autostart=1` | Skips the menu and starts a new run (useful inside a widget that should go straight to gameplay). |
+
+**Example**
+
+`https://your-host/marble_roll/?embed=1&session_uid=prog-user-123&autostart=1`
+
+**`postMessage` to the parent** (`event.data.source === 'marble-roll'`)
+
+- `type: 'ready'` — Shell loaded; menu is up unless `autostart=1`.
+- `type: 'levelLoaded'` — Procgen and meshes finished for the current level; `levelIndex` is present.
+- `type: 'firstInteraction'` — First gameplay input (keyboard or pointer on the canvas), for analytics parity with Drimify-style “first play”.
+- `type: 'complete'` — Level goal reached. `data` mirrors DigitaService-style nesting: `data.credentials.sessionID`, `data.gameMetrics.userWon`, `data.gameMetrics.score` (run total), `data.gameMetrics.levelScore`, `data.gameMetrics.gameFinished` (true when the last level of a finite set is done).
+
+The parent should verify `event.source` is the iframe’s `contentWindow` before acting on messages.
+
+**Encore module wiring** — This repo is not inside the Encore tree. Host the static build over **HTTPS**, point an iframe `src` (or a small Grove module analogous to `DrimifyIframeSingleGame`) at the game URL, and optionally POST scores to your own endpoint using the `complete` payload instead of Drimify’s `SaveGamePlay` URL.

@@ -59,4 +59,28 @@ export class InputSystem {
   isBrakeActive() {
     return this._keys.has('ShiftLeft') || this._keys.has('ShiftRight');
   }
+
+  /**
+   * Any gameplay-related key pressed this frame (for embed first-interaction telemetry).
+   * @returns {boolean}
+   */
+  hasAnyGameplayEdge() {
+    const codes = [
+      'KeyW',
+      'KeyA',
+      'KeyS',
+      'KeyD',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'Space',
+      'ShiftLeft',
+      'ShiftRight',
+    ];
+    for (const c of codes) {
+      if (this._edgeDown.has(c)) return true;
+    }
+    return false;
+  }
 }

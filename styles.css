@@ -4,20 +4,62 @@
   box-sizing: border-box;
 }
 
+/**
+ * SpaceShooterAssetPack: `assets/SpaceShooterAssetPack_BackGrounds.png` (386×513),
+ * `assets/SpaceShooterAssetPack_IU.png` (198×112, 9×22px × 7×16px cells, rendered 2× for UI).
+ */
+:root {
+  --font-ui: 'VT323', ui-monospace, monospace;
+  --bg-stars: url('assets/SpaceShooterAssetPack_BackGrounds.png');
+  --ui-tiles: url('assets/SpaceShooterAssetPack_IU.png');
+  --ui-sheet-w: 396px;
+  --ui-sheet-h: 224px;
+  --pack-blue: #5da2f0;
+  --pack-orange: #f28e2b;
+  --pack-dark: #0d1628;
+  /** Orange button row (row 4), caps cols 5–7 — see tileset */
+  --btn-row-y: -128px;
+  --btn-cap-left: -220px var(--btn-row-y);
+  --btn-mid-x: -264px var(--btn-row-y);
+  --btn-cap-right: -308px var(--btn-row-y);
+  /** Progress track / fill (bar strip region, rows 3–4) */
+  --bar-track-y: -96px;
+  --bar-fill-y: -112px;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
-  background: #0f1419;
-  color: #e8eef4;
+  font-family: var(--font-ui);
+  font-size: 22px;
+  background: #091833;
+  color: #e8f0ff;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
 }
 
 #app {
   position: relative;
   width: 100vw;
   height: 100vh;
+  isolation: isolate;
+}
+
+/** Starfield: top-left third × top half of background sheet → blue-tint panel. */
+#app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: #091833;
+  background-image: var(--bg-stars);
+  background-repeat: no-repeat;
+  background-size: 300% 200%;
+  background-position: 0 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 #game-canvas {
@@ -32,7 +74,7 @@ body {
 #ui-root {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 10;
   pointer-events: none;
   background: transparent;
 }
@@ -47,6 +89,8 @@ body {
 #ui-root .screen,
 #ui-root .hud,
 #ui-root .dev-bypass-wrap,
+#ui-root .loading-overlay,
+#ui-root .menu-actions,
 #ui-root button {
   pointer-events: auto;
 }
@@ -60,8 +104,8 @@ body {
   justify-content: center;
   padding: 2rem;
   text-align: center;
-  background: rgba(15, 20, 25, 0.72);
-  backdrop-filter: blur(6px);
+  background: rgba(9, 24, 51, 0.62);
+  backdrop-filter: blur(4px);
 }
 
 .screen[hidden] {
@@ -75,17 +119,31 @@ body {
 .screen h1,
 .screen h2 {
   margin: 0 0 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.screen h1 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  color: var(--pack-blue);
+  text-shadow:
+    2px 2px 0 var(--pack-dark),
+    -1px -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.screen h2 {
+  font-size: 1.75rem;
+  color: var(--pack-orange);
+  text-shadow: 2px 2px 0 var(--pack-dark);
 }
 
 .menu-subtitle {
   margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.8;
+  color: var(--pack-orange);
 }
 
 .menu-build {
@@ -99,34 +157,73 @@ body {
 .hint {
   margin: 0.25rem 0 1rem;
   max-width: 28rem;
-  line-height: 1.45;
-  opacity: 0.92;
+  line-height: 1.35;
+  opacity: 0.95;
+  font-size: 1.05rem;
 }
 
 .keys {
   margin: 0 0 1.5rem;
-  font-size: 0.9rem;
-  opacity: 0.75;
+  font-size: 1rem;
+  opacity: 0.88;
 }
 
+/** 3-part sprite: left cap | repeating mid | right cap (SpaceShooterAssetPack_IU.png). */
 .btn-primary {
-  cursor: pointer;
+  display: inline-flex;
+  align-items: stretch;
+  padding: 0;
   border: none;
-  border-radius: 8px;
-  padding: 0.65rem 1.4rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #0f1419;
-  background: linear-gradient(180deg, #7dd3fc 0%, #38bdf8 100%);
-  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 1.35rem;
+  image-rendering: crisp-edges;
+  background: transparent;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4));
+}
+
+.btn-primary::before,
+.btn-primary::after {
+  content: '';
+  width: 44px;
+  min-height: 32px;
+  flex-shrink: 0;
+  align-self: center;
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-repeat: no-repeat;
+}
+
+.btn-primary::before {
+  background-position: var(--btn-cap-left);
+}
+
+.btn-primary::after {
+  background-position: var(--btn-cap-right);
+}
+
+.btn-primary__label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 48px;
+  padding: 4px 8px;
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-position: var(--btn-mid-x);
+  background-repeat: repeat-x;
+  color: var(--pack-dark);
+  text-shadow: none;
 }
 
 .btn-primary:hover {
-  filter: brightness(1.05);
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4)) brightness(1.07);
 }
 
 .btn-primary:focus-visible {
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid var(--pack-blue);
   outline-offset: 3px;
 }
 
@@ -141,10 +238,10 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   cursor: pointer;
   user-select: none;
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .dev-mode-label input {
@@ -166,22 +263,23 @@ body {
 
 .btn-dev {
   cursor: pointer;
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  border-radius: 8px;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #cbd5e1;
-  background: rgba(30, 41, 59, 0.9);
+  border: 2px solid var(--pack-blue);
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--pack-blue);
+  background: rgba(13, 22, 40, 0.85);
+  image-rendering: pixelated;
+  box-shadow: 2px 2px 0 var(--pack-dark);
 }
 
 .btn-dev:hover {
-  background: rgba(51, 65, 85, 0.95);
-  color: #f1f5f9;
+  background: rgba(93, 162, 240, 0.2);
+  color: #e8f4ff;
 }
 
 .btn-dev:focus-visible {
-  outline: 2px solid #94a3b8;
+  outline: 2px solid var(--pack-orange);
   outline-offset: 2px;
 }
 
@@ -190,32 +288,136 @@ body {
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  padding: 0.4rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  background: rgba(15, 20, 25, 0.55);
+  padding: 0.35rem 0.9rem;
+  border-radius: 2px;
+  font-size: 1.05rem;
+  background: rgba(13, 22, 40, 0.82);
+  border: 2px solid var(--pack-blue);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  image-rendering: pixelated;
+}
+
+.hud-row {
+  text-align: center;
+}
+
+.hud-row--title {
+  color: var(--pack-blue);
+}
+
+.hud-row--coins {
+  font-size: 0.95rem;
+  opacity: 0.95;
+  color: var(--pack-orange);
+}
+
+.hud-sep {
+  margin: 0 0.35rem;
+  opacity: 0.65;
+}
+
+.level-complete-scores {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 1.1rem;
+  color: var(--pack-blue);
+  white-space: pre-line;
+  text-align: center;
 }
 
 .hud[hidden] {
   display: none;
 }
 
-/** Shown during procedural generation so the UI does not look frozen. */
+/** Full-screen load: procgen + mesh build (see GameApplication._runLevelLoadFlow). */
 .loading-overlay {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  pointer-events: none;
-  padding: 0.65rem 1.25rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #e8eef4;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.loading-overlay__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(9, 24, 51, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.loading-overlay__card {
+  position: relative;
+  z-index: 1;
+  min-width: min(22rem, 90vw);
+  padding: 1.5rem 1.35rem;
+  border-radius: 2px;
+  text-align: center;
+  background: rgba(13, 22, 40, 0.88);
+  border: 3px solid var(--pack-orange);
+  box-shadow:
+    4px 4px 0 var(--pack-dark),
+    0 12px 40px rgba(0, 0, 0, 0.45);
+  image-rendering: pixelated;
+}
+
+.loading-overlay__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--pack-blue);
+  text-shadow: 2px 2px 0 var(--pack-dark);
+}
+
+.loading-overlay__phase {
+  margin: 0 0 0.85rem;
+  min-height: 1.35rem;
+  font-size: 1.05rem;
+  color: var(--pack-orange);
+}
+
+.loading-overlay__card progress {
+  width: 100%;
+  height: 18px;
+  vertical-align: middle;
+  appearance: none;
+  border: 2px solid var(--pack-dark);
+  overflow: hidden;
+  background-color: rgba(9, 24, 51, 0.9);
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-position: 0 var(--bar-track-y);
+  background-repeat: repeat-x;
+  image-rendering: pixelated;
+}
+
+.loading-overlay__card progress::-webkit-progress-bar {
+  background-color: transparent;
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-position: 0 var(--bar-track-y);
+  background-repeat: repeat-x;
+}
+
+.loading-overlay__card progress::-webkit-progress-value {
+  background-color: var(--pack-orange);
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-position: 0 var(--bar-fill-y);
+  background-repeat: repeat-x;
+}
+
+/** Firefox: `::-moz-progress-bar` is the filled portion. */
+.loading-overlay__card progress::-moz-progress-bar {
+  background-color: var(--pack-orange);
+  background-image: var(--ui-tiles);
+  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
+  background-position: 0 var(--bar-fill-y);
+  background-repeat: repeat-x;
 }
 
 .loading-overlay[hidden] {
@@ -226,4 +428,13 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
   filter: grayscale(0.2);
+}
+
+/** Encore / Grove iframe: `body.embed` from `EmbedHost` */
+body.embed .dev-mode-label {
+  display: none;
+}
+
+body.embed .menu-build {
+  display: none;
 }

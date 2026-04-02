@@ -28,7 +28,7 @@ export function buildSpineFromDrunkardGrid(levelIndex, pg) {
   let layout;
   let plan;
   let attempt = 0;
-  const maxAttempts = 6;
+  const maxAttempts = Math.max(1, Math.floor(pg.grid?.maxBuildAttempts ?? 4));
 
   for (; attempt < maxAttempts; attempt++) {
     const rng = createProcgenRng(levelIndex, `drunkardGrid_${attempt}`);

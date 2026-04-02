@@ -101,26 +101,39 @@ export function ensureVerticalBudget(expanded, levelIndex) {
 }
 
 /**
- * Prefer sloped **`r`** over **`^F`** (step + flat tile) for a ramp-heavy look; deterministic.
+ * Prefer sloped **`r`** over **`^F`** (step + flat tile); rate from **`pg.stepUpRampConversionShare`**.
  * @param {string} expanded
  * @param {number} levelIndex
+ * @param {{ stepUpRampConversionShare?: number } | null | undefined} [pg]  `GameplaySettings.procgen`; omit for legacy ≈2/3 ramp bias.
  * @returns {string}
  */
-export function preferRampsOverStepJumps(expanded, levelIndex) {
-  let out = '';
-  for (let i = 0; i < expanded.length; ) {
-    if (expanded[i] === '^' && i + 1 < expanded.length && expanded[i + 1] === 'F') {
-      const h = ((levelIndex * 1315423911 + i * 17 + expanded.length) >>> 0) % 3;
-      if (h !== 0) {
-        out += 'r';
+export function preferRampsOverStepJumps(expanded, levelIndex, pg) {
+  const legacyRampShare = 2 / 3;
+  const share = Math.min(
+    1,
+    Math.max(
+      0,
+      pg?.stepUpRampConversionShare ?? legacyRampShare,
+    ),
+  );
+  /** @type {string[]} */
+  const parts = [];
+  const n = expanded.length;
+  for (let i = 0; i < n; ) {
+    if (expanded[i] === '^' && i + 1 < n && expanded[i + 1] === 'F') {
+      const u =
+        (((levelIndex * 1315423911 + i * 17 + n) >>> 0) % 1_000_001) /
+        1_000_001;
+      if (u < share) {
+        parts.push('r');
         i += 2;
         continue;
       }
     }
-    out += expanded[i];
+    parts.push(expanded[i]);
     i += 1;
   }
-  return out;
+  return parts.join('');
 }
 
 /**

@@ -9,6 +9,18 @@ import { PhysicsSystem } from './systems/PhysicsSystem.js';
 import { UISystem } from './systems/UISystem.js';
 import { ControlSettings } from './config/ControlSettings.js';
 import { generateProcgenDescriptor } from './procgen/generateProcgenDescriptor.js';
+import { yieldToPaint } from './util/yieldToPaint.js';
+import { CoinPickupRuntime } from './collectibles/CoinPickupRuntime.js';
+import { RunCoinLedger } from './scoring/RunCoinLedger.js';
+import {
+  initEmbedHost,
+  isEmbedActive,
+  notifyFirstInteraction,
+  notifyLevelComplete,
+  notifyLevelLoaded,
+  notifyReady,
+  shouldAutostart,
+} from './embed/EmbedHost.js';
 
 /**
  * Win test: centre distance ≤ goal capture radius + marble radius (see gen/specs/SPEC.md §3.3).
@@ -54,6 +66,8 @@ export class GameApplication {
     this.ui = new UISystem();
     this.physics = new PhysicsSystem();
     this.levelLoader = new LevelLoader();
+    this.coinRuntime = new CoinPickupRuntime();
+    this.coinLedger = new RunCoinLedger();
 
     /** @type {{ schemaVersion: number, levels: object[] } | null} */
     this.bundle = null;
@@ -74,10 +88,17 @@ export class GameApplication {
     this._killPlaneY = -100;
     /** When true (start screen dev checkbox), in-run dev tools such as skip level are available. */
     this._devMode = false;
+    /** Embed mode: first gameplay input reported to parent (see `EmbedHost`). Set in `start`. */
+    this._embedFirstInteractionPending = false;
+    /** @type {(() => void) | null} */
+    this._onEmbedPointerDown = null;
+    /** Prevents overlapping async level loads (New game / next level / debug load). */
+    this._levelLoadInProgress = false;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87b8d8);
-    this.scene.fog = new THREE.Fog(0x87b8d8, 28, 90);
+    /** Sky colour comes from CSS starfield behind the canvas (`alpha: true`). */
+    this.scene.background = null;
+    this.scene.fog = new THREE.Fog(0x133e7c, 24, 92);
 
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
     this.camera.position.set(0, 10, 16);
@@ -85,79 +106,123 @@ export class GameApplication {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
-      alpha: false,
+      alpha: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    /** Let CSS `#app::before` starfield show through the WebGL surface. */
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this._materials = {
       static: new THREE.MeshStandardMaterial({
-        color: 0x4a5d6b,
-        roughness: 0.85,
-        metalness: 0.05,
+        color: 0x711c91,
+        roughness: 0.72,
+        metalness: 0.18,
+        emissive: 0x2a0d38,
+        emissiveIntensity: 0.12,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
       }),
       plaza: new THREE.MeshStandardMaterial({
-        color: 0xe8d48a,
-        roughness: 0.78,
-        metalness: 0.04,
+        color: 0x711c91,
+        roughness: 0.68,
+        metalness: 0.2,
+        emissive: 0x3d1560,
+        emissiveIntensity: 0.18,
+        polygonOffset: true,
+        polygonOffsetFactor: 3,
+        polygonOffsetUnits: 1,
       }),
       path: new THREE.MeshStandardMaterial({
-        color: 0x5a7d8c,
-        roughness: 0.82,
-        metalness: 0.06,
+        color: 0x711c91,
+        roughness: 0.7,
+        metalness: 0.2,
+        emissive: 0x2a0d38,
+        emissiveIntensity: 0.1,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
       }),
       pathWide: new THREE.MeshStandardMaterial({
-        color: 0x6a8d9c,
-        roughness: 0.8,
-        metalness: 0.06,
+        color: 0xea00d9,
+        roughness: 0.58,
+        metalness: 0.28,
+        emissive: 0x6b0062,
+        emissiveIntensity: 0.22,
+        polygonOffset: true,
+        polygonOffsetFactor: 2,
+        polygonOffsetUnits: 1,
       }),
       ramp: new THREE.MeshStandardMaterial({
-        color: 0x52b788,
-        roughness: 0.75,
-        metalness: 0.05,
+        color: 0xea00d9,
+        roughness: 0.6,
+        metalness: 0.22,
+        emissive: 0x5c0054,
+        emissiveIntensity: 0.15,
+        polygonOffset: true,
+        polygonOffsetFactor: 2,
+        polygonOffsetUnits: 1,
       }),
       goal: new THREE.MeshStandardMaterial({
-        color: 0x38bdf8,
-        emissive: 0x0c4a6e,
-        emissiveIntensity: 0.55,
+        color: 0xff6b35,
+        emissive: 0x8b2500,
+        emissiveIntensity: 0.5,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.45,
         roughness: 0.35,
-        metalness: 0.1,
-        depthWrite: false,
-      }),
-      zoneStart: new THREE.MeshStandardMaterial({
-        color: 0x4ade80,
-        emissive: 0x14532d,
-        emissiveIntensity: 0.35,
-        transparent: true,
-        opacity: 0.55,
-        roughness: 0.4,
         metalness: 0.15,
         depthWrite: false,
       }),
-      zoneEnd: new THREE.MeshStandardMaterial({
-        color: 0xfbbf24,
-        emissive: 0x78350f,
+      zoneStart: new THREE.MeshStandardMaterial({
+        color: 0x0abdc6,
+        emissive: 0x045a61,
         emissiveIntensity: 0.45,
         transparent: true,
-        opacity: 0.55,
-        roughness: 0.35,
+        opacity: 0.58,
+        roughness: 0.38,
+        metalness: 0.22,
+        depthWrite: false,
+      }),
+      zoneEnd: new THREE.MeshStandardMaterial({
+        color: 0xff6b35,
+        emissive: 0x8b2500,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.58,
+        roughness: 0.34,
         metalness: 0.2,
         depthWrite: false,
       }),
       lattice: new THREE.MeshStandardMaterial({
-        color: 0x8a9caf,
+        color: 0x0abdc6,
         wireframe: true,
-        metalness: 0.12,
-        roughness: 0.8,
+        metalness: 0.35,
+        roughness: 0.55,
+        emissive: 0x045a61,
+        emissiveIntensity: 0.25,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+      }),
+      coin: new THREE.MeshStandardMaterial({
+        color: 0xe0ffff,
+        emissive: 0x00fff2,
+        emissiveIntensity: 1.65,
+        roughness: 0.12,
+        metalness: 0.45,
+        polygonOffset: true,
+        polygonOffsetFactor: -0.8,
+        polygonOffsetUnits: -1,
       }),
       marble: new THREE.MeshStandardMaterial({
-        color: 0xd4e8f5,
-        roughness: 0.25,
-        metalness: 0.65,
+        color: 0xfff59a,
+        roughness: 0.14,
+        metalness: 0.42,
+        emissive: 0xffee00,
+        emissiveIntensity: 1.1,
       }),
     };
 
@@ -167,9 +232,9 @@ export class GameApplication {
     this.marbleMesh.receiveShadow = false;
     this.scene.add(this.marbleMesh);
 
-    const hemi = new THREE.HemisphereLight(0xddeeff, 0x334455, 0.55);
+    const hemi = new THREE.HemisphereLight(0x4a2a6b, 0x091833, 0.48);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.05);
+    const sun = new THREE.DirectionalLight(0xffe8ff, 0.92);
     sun.position.set(18, 32, 12);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -205,39 +270,133 @@ export class GameApplication {
   }
 
   async start() {
-    console.log('[marble] loading level manifest…');
-    await this._loadLevelBundle();
-    console.log('[marble] ready — flat materials only; filter [procgen] or [level] for timings.');
+    initEmbedHost();
+    this._embedFirstInteractionPending = isEmbedActive();
+    if (this._embedFirstInteractionPending && this.canvas) {
+      this._onEmbedPointerDown = () => {
+        if (!this._embedFirstInteractionPending) return;
+        this._embedFirstInteractionPending = false;
+        notifyFirstInteraction();
+      };
+      this.canvas.addEventListener('pointerdown', this._onEmbedPointerDown);
+    }
     this._registerCommands();
     this._wireUi();
+    this._hydrateBundleFromInlineManifest();
+    this.ui.setMenuManifestLoading(!this.bundle);
+    this._loop.start();
+
+    if (!this.bundle) {
+      console.log('[marble] loading level manifest…');
+      await this._loadLevelBundle();
+    } else {
+      console.log('[marble] level manifest from inline #marble-level-manifest (fetch skipped).');
+    }
+    console.log('[marble] ready — flat materials only; filter [procgen] or [level] for timings.');
+
+    this.ui.setMenuManifestLoading(false);
     this.ui.showMenu();
     this._onResize();
-    this._loop.start();
+    if (shouldAutostart()) {
+      this.queue.enqueue({ type: 'START_GAME' });
+    }
+    notifyReady();
+  }
+
+  /**
+   * Parsed from `index.html` so the game can boot even when `fetch('levels/levels.json')` never runs.
+   */
+  _hydrateBundleFromInlineManifest() {
+    const el = document.getElementById('marble-level-manifest');
+    const raw = el?.textContent?.trim();
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      if (data && typeof data.schemaVersion === 'number') {
+        this.bundle = data;
+      }
+    } catch (e) {
+      console.warn('[marble] inline #marble-level-manifest is not valid JSON.', e);
+    }
   }
 
   async _loadLevelBundle() {
-    const url = new URL('../levels/levels.json', import.meta.url);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to load levels: ${res.status}`);
-    this.bundle = await res.json();
-    if (this.bundle.schemaVersion !== 2 || !this.bundle.procgen) {
-      console.warn('levels.json should use schemaVersion 2 with procgen: true.');
+    const origins = new Set();
+    try {
+      origins.add(new URL('../levels/levels.json', import.meta.url).href);
+    } catch {
+      /* ignore */
     }
+    origins.add(new URL('/levels/levels.json', window.location.origin).href);
+    try {
+      origins.add(new URL('levels/levels.json', window.location.href).href);
+    } catch {
+      /* ignore */
+    }
+
+    const urls = [...origins];
+    let lastErr = /** @type {Error | null} */ (null);
+
+    for (const href of urls) {
+      const ctrl = new AbortController();
+      const t = window.setTimeout(() => ctrl.abort(), 20000);
+      try {
+        console.log('[marble] fetching manifest:', href);
+        const res = await fetch(href, { signal: ctrl.signal, cache: 'no-store' });
+        if (!res.ok) {
+          lastErr = new Error(`Failed to load levels: ${res.status}`);
+          continue;
+        }
+        this.bundle = await res.json();
+        if (this.bundle.schemaVersion !== 2 || !this.bundle.procgen) {
+          console.warn('levels.json should use schemaVersion 2 with procgen: true.');
+        }
+        return;
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        lastErr = err;
+        console.warn('[marble] manifest fetch failed:', href, err.message);
+      } finally {
+        window.clearTimeout(t);
+      }
+    }
+
+    throw lastErr ?? new Error('Could not load levels.json from any known URL.');
   }
 
   _registerCommands() {
     this.queue.register('START_GAME', () => {
+      console.log('[marble:flow] ③ START_GAME handler', {
+        loadInProgress: this._levelLoadInProgress,
+        hasBundle: !!this.bundle,
+        state: this.states.state,
+      });
+      if (this._levelLoadInProgress) {
+        console.warn('[marble:flow] ③a abort: _levelLoadInProgress');
+        return;
+      }
+      if (!this.bundle) {
+        this.ui.setMenuSubtitle('Still loading level list… try again in a moment.');
+        console.warn(
+          '[marble:flow] ③b abort: no bundle (manifest).',
+        );
+        return;
+      }
       this._devMode = !!this.ui.devModeCheckbox?.checked;
+      this.coinLedger.startNewRun();
       this.session.currentLevelIndex = 0;
-      this._runLevelLoadDeferred(this.session.currentLevelIndex, () => {
+      console.log('[marble:flow] ④ calling _runLevelLoadFlow(0)');
+      void this._runLevelLoadFlow(this.session.currentLevelIndex, () => {
+        console.log('[marble:flow] ⑫ done callback: entering playing + focus');
         this.states.setState('playing');
         this._focusPlay();
       });
     });
 
     this.queue.register('LOAD_LEVEL', (payload) => {
+      if (this._levelLoadInProgress) return;
       if (!payload || typeof payload.index !== 'number') return;
-      this._runLevelLoadDeferred(payload.index, () => {
+      void this._runLevelLoadFlow(payload.index, () => {
         this.states.setState('playing');
         this._focusPlay();
       });
@@ -246,6 +405,9 @@ export class GameApplication {
     this.queue.register('RESTART_LEVEL', () => {
       if (!this.states.is('playing') && !this.states.is('marbleDead')) return;
       if (!this._spawn) return;
+      this.coinLedger.resetLevelProgress();
+      this.coinRuntime.resetLevel();
+      this._refreshCoinHud();
       this.physics.resetMarble(this._spawn);
       this._startZoneTouched = false;
       if (this.states.is('marbleDead')) {
@@ -273,13 +435,16 @@ export class GameApplication {
         this.bundle.procgen === true && this.bundle.infiniteLevels === true;
       const next = this.session.currentLevelIndex + 1;
       if (infinite || next < count) {
+        if (this._levelLoadInProgress) return;
         this.session.currentLevelIndex = next;
-        this._runLevelLoadDeferred(this.session.currentLevelIndex, () => {
+        void this._runLevelLoadFlow(this.session.currentLevelIndex, () => {
           this.states.setState('playing');
           this._focusPlay();
         });
       } else {
         this.session.currentLevelIndex = 0;
+        this.coinLedger.startNewRun();
+        this.coinRuntime.clear();
         this.levelLoader.clear(this.physics.world, this.scene);
         this.physics.removeMarble();
         this._spawn = null;
@@ -305,17 +470,28 @@ export class GameApplication {
         this.bundle.procgen === true && this.bundle.infiniteLevels === true;
       const isFinal =
         !infinite && this.session.currentLevelIndex >= count - 1;
+      const { levelScore, runTotalAfter } = this.coinLedger.bankForLevelComplete();
       this.ui.showLevelComplete(
         'Level complete',
         'Press Enter to continue.',
         isFinal,
+        { levelScore, runTotal: runTotalAfter },
       );
       if (levelName && this.ui.levelCompleteTitle) {
         this.ui.levelCompleteTitle.textContent = `${levelName} — complete`;
       }
+      notifyLevelComplete({
+        levelIndex: this.session.currentLevelIndex,
+        levelScore,
+        runTotal: runTotalAfter,
+        gameFinished: isFinal,
+        userWon: true,
+      });
     });
 
     this.queue.register('RETURN_TO_MENU', () => {
+      this.coinLedger.startNewRun();
+      this.coinRuntime.clear();
       this.levelLoader.clear(this.physics.world, this.scene);
       this.physics.removeMarble();
       this._spawn = null;
@@ -328,19 +504,43 @@ export class GameApplication {
     });
   }
 
+  /**
+   * Runs the command in the same turn so a menu click is not lost waiting for the next animation frame.
+   * @param {{ type: string, payload?: object }} cmd
+   */
+  _enqueueAndDrain(cmd) {
+    console.log('[marble:flow] enqueue', cmd.type);
+    this.queue.enqueue(cmd);
+    this.queue.drain(16);
+    console.log('[marble:flow] enqueue returned after drain', cmd.type);
+  }
+
   _wireUi() {
+    if (!this.ui.btnNewGame) {
+      console.error('[marble:flow] #btn-new-game is null — wireUi cannot attach listeners.');
+    } else {
+      console.log('[marble:flow] wiring #btn-new-game (click + pointerdown capture)');
+    }
+    this.ui.btnNewGame?.addEventListener(
+      'pointerdown',
+      () => {
+        console.log('[marble:flow] ① pointerdown on New game (reaches button)');
+      },
+      true,
+    );
     this.ui.btnNewGame?.addEventListener('click', () => {
-      this.queue.enqueue({ type: 'START_GAME' });
+      console.log('[marble:flow] ② click on New game');
+      this._enqueueAndDrain({ type: 'START_GAME' });
     });
     this.ui.btnContinue?.addEventListener('click', () => {
-      this.queue.enqueue({ type: 'ADVANCE_LEVEL' });
+      this._enqueueAndDrain({ type: 'ADVANCE_LEVEL' });
     });
     this.ui.btnTryAgain?.addEventListener('click', () => {
-      this.queue.enqueue({ type: 'RESTART_LEVEL' });
+      this._enqueueAndDrain({ type: 'RESTART_LEVEL' });
     });
     this.ui.btnDevSkip?.addEventListener('click', () => {
       if (!this._devMode || !this.states.is('playing')) return;
-      this.queue.enqueue({
+      this._enqueueAndDrain({
         type: 'GOAL_REACHED',
         payload: { levelIndex: this.session.currentLevelIndex },
       });
@@ -350,30 +550,100 @@ export class GameApplication {
   _focusPlay() {
     const name = formatLevelLabel(this.session.currentLevelIndex);
     this.ui.showPlaying(name, this._devMode);
+    this._refreshCoinHud();
     this.canvas?.focus();
   }
 
+  _refreshCoinHud() {
+    this.ui.setPlayingCoinHud(
+      this.coinLedger.getLevelCollected(),
+      this.coinLedger.getLevelTotal(),
+      this.coinLedger.getRunDisplayTotal(),
+    );
+  }
+
   /**
-   * Yields two animation frames so the browser can paint a loading state before heavy procgen / mesh build.
+   * Async level load: full-screen progress bar during procgen yields and mesh build.
    * @param {number} index
    * @param {() => void} [done]
    */
-  _runLevelLoadDeferred(index, done) {
-    this.ui.setLevelLoading(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try {
-          const t0 = performance.now();
-          this._loadLevelAtIndex(index);
-          console.log(`[level] index ${index} loaded in ${(performance.now() - t0).toFixed(1)}ms (procgen + meshes)`);
-        } catch (err) {
-          console.error('[level] load failed', err);
-        } finally {
-          this.ui.setLevelLoading(false);
+  async _runLevelLoadFlow(index, done) {
+    console.log('[marble:flow] ⑤ _runLevelLoadFlow entry', { index });
+    if (this._levelLoadInProgress) {
+      console.warn('[marble:flow] ⑤a abort: already in progress');
+      return;
+    }
+    if (!this.bundle) {
+      console.warn('[marble:flow] ⑤b abort: no bundle');
+      return;
+    }
+    this._levelLoadInProgress = true;
+    const levelLabel = formatLevelLabel(index);
+    this.ui.showLevelLoadingScreen(`Generating level ${levelLabel}…`);
+    try {
+      console.log('[marble:flow] ⑥ await yieldToPaint (loading overlay should paint)');
+      await yieldToPaint();
+      if (!this.bundle) {
+        console.warn('[marble:flow] ⑥a abort: bundle cleared');
+        return;
+      }
+
+      /** @type {object | undefined} */
+      let descriptor;
+      if (this.bundle.procgen) {
+        console.log('[marble:flow] ⑦ await generateProcgenDescriptor…');
+        descriptor = await generateProcgenDescriptor(index, {
+          yieldForUi: () => yieldToPaint(),
+          onProgress: (info) => {
+            this.ui.setLevelLoadProgress(info.fraction * 0.75, info.label);
+          },
+        });
+        console.log('[marble:flow] ⑧ generateProcgenDescriptor resolved', {
+          id: descriptor?.id,
+        });
+      } else {
+        this.ui.setLevelLoadProgress(0.25, 'Loading level data…');
+        await yieldToPaint();
+        descriptor = this.bundle.levels?.[index];
+        if (!descriptor) {
+          console.warn(`[level] no descriptor for index ${index}`);
+          return;
         }
-        done?.();
-      });
-    });
+        this.ui.setLevelLoadProgress(0.75, 'Building meshes…');
+        await yieldToPaint();
+      }
+
+      if (!descriptor) {
+        console.warn('[marble:flow] ⑧a abort: no descriptor', index);
+        return;
+      }
+
+      this.ui.setLevelLoadProgress(0.75, 'Building meshes…');
+      await yieldToPaint();
+      console.log('[marble:flow] ⑨ _applyLoadedLevel (LevelLoader.build)…');
+      const t0 = performance.now();
+      this._applyLoadedLevel(descriptor, index);
+      console.log(
+        `[marble:flow] ⑩ level meshes ready in ${(performance.now() - t0).toFixed(1)}ms`,
+      );
+      console.log(
+        `[level] index ${index} loaded in ${(performance.now() - t0).toFixed(1)}ms (procgen + meshes)`,
+      );
+      this.ui.setLevelLoadProgress(1, '');
+      await yieldToPaint();
+      console.log('[marble:flow] ⑪ invoking done() → playing state');
+      done?.();
+      if (isEmbedActive()) {
+        notifyLevelLoaded({ levelIndex: this.session.currentLevelIndex });
+      }
+    } catch (err) {
+      console.error('[marble:flow] load failed (catch)', err);
+      console.error('[level] load failed', err);
+    } finally {
+      console.log('[marble:flow] ⑬ finally: hide loading overlay, clear load lock');
+      this.ui.hideLevelLoadingScreen();
+      this._levelLoadInProgress = false;
+    }
   }
 
   _resetCameraOrbit() {
@@ -382,22 +652,17 @@ export class GameApplication {
   }
 
   /**
+   * Applies a ready descriptor: physics meshes, spawn, coins session for this level.
+   * @param {object} descriptor
    * @param {number} index
    */
-  _loadLevelAtIndex(index) {
-    if (!this.bundle) return;
-
-    let descriptor;
-    if (this.bundle.procgen) {
-      descriptor = generateProcgenDescriptor(index);
-    } else {
-      descriptor = this.bundle.levels?.[index];
-    }
-    if (!descriptor) return;
-
+  _applyLoadedLevel(descriptor, index) {
+    console.log('[marble:flow] ⑨a levelLoader.clear');
     this.levelLoader.clear(this.physics.world, this.scene);
     const tBuild = performance.now();
+    console.log('[marble:flow] ⑨b levelLoader.build…');
     const built = this.levelLoader.build(this.physics.world, this.scene, this._materials, descriptor);
+    console.log(`[marble:flow] ⑨c LevelLoader.build done ${(performance.now() - tBuild).toFixed(1)}ms`);
     console.log(`[level] LevelLoader.build ${(performance.now() - tBuild).toFixed(1)}ms`);
     this._spawn = /** @type {[number, number, number]} */ ([
       descriptor.spawn[0],
@@ -416,7 +681,10 @@ export class GameApplication {
     this.session.currentLevelIndex = index;
 
     this.physics.createMarble(this._spawn);
+    this.coinRuntime.load(built.coinEntries ?? []);
+    this.coinLedger.beginLevel(Array.isArray(descriptor.coins) ? descriptor.coins.length : 0);
     this._syncMarbleMesh();
+    this._refreshCoinHud();
   }
 
   _onResize() {
@@ -440,11 +708,29 @@ export class GameApplication {
     }
 
     if (this.states.is('playing')) {
+      if (this._embedFirstInteractionPending) {
+        if (this.input.hasAnyGameplayEdge()) {
+          this._embedFirstInteractionPending = false;
+          notifyFirstInteraction();
+        }
+      }
       this._applyCameraControls(deltaSeconds);
       this._updateCamera();
       this._applyMarbleControls(deltaSeconds);
       this._checkWinCondition();
       this._checkFall();
+      const body = this.physics.marbleBody;
+      if (body) {
+        const picked = this.coinRuntime.update(
+          body.interpolatedPosition,
+          this.physics.marbleRadius,
+          deltaSeconds,
+        );
+        if (picked > 0) {
+          this.coinLedger.collect(picked);
+          this._refreshCoinHud();
+        }
+      }
     }
 
     this._syncMarbleMesh();

@@ -13,7 +13,9 @@ export function mainPathToSpine(main, angleRad, leadingFCount) {
     return 'F'.repeat(lead + 12);
   }
 
-  let out = 'F'.repeat(lead);
+  /** @type {string[]} */
+  const parts = [];
+  if (lead > 0) parts.push('F'.repeat(lead));
   let currentYaw = 0;
 
   for (let i = 0; i < main.length - 1; i++) {
@@ -27,14 +29,16 @@ export function mainPathToSpine(main, angleRad, leadingFCount) {
 
     const steps = Math.round(delta / angleRad);
     const n = Math.min(64, Math.abs(steps));
-    const ch = steps >= 0 ? '+' : '-';
-    for (let k = 0; k < n; k++) out += ch;
+    if (n > 0) {
+      const ch = steps >= 0 ? '+' : '-';
+      parts.push(ch.repeat(n));
+    }
 
     currentYaw = normalizeAngle(desired);
-    out += 'F';
+    parts.push('F');
   }
 
-  return out;
+  return parts.join('');
 }
 
 /**

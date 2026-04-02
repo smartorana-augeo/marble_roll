@@ -7,7 +7,10 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Marble roll</title>
-  <link rel="stylesheet" href="styles.css?v=20260401a">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260401k" />
   <script type="importmap">
   {
     "imports": {
@@ -17,6 +20,10 @@
     }
   }
   </script>
+  <!-- Bootstraps without a separate fetch; keeps New game working if levels.json requests fail. -->
+  <script type="application/json" id="marble-level-manifest">
+{"schemaVersion":2,"procgen":true,"infiniteLevels":true}
+  </script>
 </head>
 <body>
   <div id="app">
@@ -25,9 +32,7 @@
       <div id="screen-menu" class="screen screen--visible">
         <h1 id="menu-heading">Marble roll</h1>
         <p class="menu-subtitle" id="menu-subtitle">3D physics marble</p>
-        <p class="hint" id="menu-hint">
-          Roll to the gold goal. Touch the green start pad first. Courses have gaps and small height changes you can jump — harder on later levels. Each level is generated at load and can take a moment.
-        </p>
+        <p class="hint" id="menu-hint">Roll to the orange goal.</p>
         <p class="keys" id="menu-keys">
           <strong>Move</strong> WASD or arrows · <strong>Jump</strong> Space · <strong>Brake</strong> Shift · <strong>Camera</strong> arrow keys (orbit) · <strong>Restart</strong> R
         </p>
@@ -36,33 +41,53 @@
             <input type="checkbox" id="dev-mode" />
             Dev mode (skip level)
           </label>
-          <button type="button" id="btn-new-game" class="btn-primary">New game</button>
+          <button type="button" id="btn-new-game" class="btn-primary">
+            <span class="btn-primary__label">New game</span>
+          </button>
         </div>
         <p class="menu-build" title="If this line is missing, the browser or server is not loading this folder’s index.html">
-          WebGL + cannon-es · procgen grid + jump splits · build 20260401b
+          WebGL + cannon-es · procgen grid + jump splits · embed-ready · build 20260401d
         </p>
       </div>
       <div id="loading-overlay" class="loading-overlay" hidden aria-busy="true" aria-live="polite">
-        <p id="loading-overlay-text">Generating level…</p>
+        <div class="loading-overlay__scrim" aria-hidden="true"></div>
+        <div class="loading-overlay__card" role="status">
+          <h2 id="loading-overlay-title" class="loading-overlay__title">Generating course…</h2>
+          <p id="loading-phase" class="loading-overlay__phase"></p>
+          <progress
+            id="loading-progress"
+            max="100"
+            value="0"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          ></progress>
+        </div>
       </div>
       <div id="screen-marble-dead" class="screen" hidden>
         <h2 id="death-heading">Out of bounds</h2>
         <p class="hint" id="death-hint">You fell too far. Press the button or R to try again.</p>
-        <button type="button" id="btn-try-again" class="btn-primary">Try again</button>
+        <button type="button" id="btn-try-again" class="btn-primary">
+          <span class="btn-primary__label">Try again</span>
+        </button>
       </div>
       <div id="screen-level-complete" class="screen" hidden>
         <h2 id="level-complete-title">Level complete</h2>
+        <p id="level-complete-scores" class="level-complete-scores" hidden></p>
         <p id="level-complete-msg" class="hint">Press Enter to continue.</p>
-        <button type="button" id="btn-continue" class="btn-primary">Next level</button>
+        <button type="button" id="btn-continue" class="btn-primary">
+          <span class="btn-primary__label">Next level</span>
+        </button>
       </div>
       <div id="hud" class="hud" hidden>
-        <span id="hud-level-name"></span>
+        <div class="hud-row hud-row--title"><span id="hud-level-name"></span></div>
+        <div class="hud-row hud-row--coins"><span id="hud-coins-level"></span><span class="hud-sep" aria-hidden="true">·</span><span id="hud-coins-run"></span></div>
       </div>
       <div id="dev-bypass-wrap" class="dev-bypass-wrap" hidden>
         <button type="button" id="btn-dev-skip-level" class="btn-dev">Skip level</button>
       </div>
     </div>
   </div>
-  <script type="module" src="main.js?v=20260401b"></script>
+  <script type="module" src="main.js?v=20260401k"></script>
 </body>
 </html>

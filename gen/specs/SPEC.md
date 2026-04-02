@@ -211,6 +211,8 @@ All commands are enqueued on **FrameCommandQueue** as `{ type: string, payload?:
 
 **Note:** `levelIndex` in `GOAL_REACHED` should match the session when emitted.
 
+**Level load (async UI):** `START_GAME`, `LOAD_LEVEL`, and `ADVANCE_LEVEL` (when advancing into a new level) start **`GameApplication._runLevelLoadFlow`** without blocking the command handler’s return (`void` on an async function). A full-screen loading overlay with a determinate **`<progress>`** bar is shown; **`generateProcgenDescriptor`** accepts **`yieldForUi`** (typically **`requestAnimationFrame`**) between procgen phases so the bar can update, then **`LevelLoader.build`** fills the remainder of the bar. **`_levelLoadInProgress`** suppresses overlapping loads.
+
 ---
 
 ## 7. Frame pipeline

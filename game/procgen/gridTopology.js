@@ -9,45 +9,32 @@ export function buildRoutePlan(layout) {
 
   const isFloor = (v) => v === 1 || v === 2;
 
-  /** @type {{ cx: number, cy: number }[]} */
-  const floorCells = [];
-  for (let cy = 0; cy < height; cy++) {
-    for (let cx = 0; cx < width; cx++) {
-      if (isFloor(tiles[idx(cx, cy)])) {
-        floorCells.push({ cx, cy });
-      }
-    }
-  }
-
-  if (floorCells.length === 0) {
+  const si = idx(startCell.cx, startCell.cy);
+  if (!isFloor(tiles[si])) {
     return { main: [startCell], branches: [], goalCell: startCell, maxDist: 0 };
   }
 
-  const { dist, prev } = bfsFrom(width, height, tiles, startCell, isFloor, idx);
+  const { prev, goalCell, maxDist } = bfsFarthestGoal(
+    width,
+    height,
+    tiles,
+    startCell,
+    isFloor,
+    idx,
+  );
 
-  let best = startCell;
-  let bestD = dist[idx(startCell.cx, startCell.cy)] ?? -1;
-  for (const c of floorCells) {
-    const d = dist[idx(c.cx, c.cy)];
-    if (d < 0) continue;
-    if (d > bestD || (d === bestD && (c.cx < best.cx || (c.cx === best.cx && c.cy < best.cy)))) {
-      bestD = d;
-      best = c;
-    }
-  }
-
-  const goalCell = best;
   const main = reconstructPath(width, height, startCell, goalCell, prev, idx);
 
   return {
     main,
     branches: [],
     goalCell,
-    maxDist: bestD,
+    maxDist,
   };
 }
 
 /**
+ * BFS from start; tracks lexicographically smallest cell among those at maximum graph distance.
  * @param {number} width
  * @param {number} height
  * @param {Uint8Array} tiles
@@ -55,7 +42,7 @@ export function buildRoutePlan(layout) {
  * @param {(v: number) => boolean} isFloor
  * @param {(cx: number, cy: number) => number} idx
  */
-function bfsFrom(width, height, tiles, start, isFloor, idx) {
+function bfsFarthestGoal(width, height, tiles, start, isFloor, idx) {
   const n = width * height;
   const dist = new Int32Array(n);
   dist.fill(-1);
@@ -67,6 +54,10 @@ function bfsFrom(width, height, tiles, start, isFloor, idx) {
 
   const si = idx(start.cx, start.cy);
   dist[si] = 0;
+
+  let bestD = 0;
+  let bestCx = start.cx;
+  let bestCy = start.cy;
 
   /** @type {number[]} */
   const q = [si];
@@ -81,13 +72,26 @@ function bfsFrom(width, height, tiles, start, isFloor, idx) {
       const ni = idx(nx, ny);
       if (!isFloor(tiles[ni])) continue;
       if (dist[ni] >= 0) continue;
-      dist[ni] = dist[cur] + 1;
+      const nd = dist[cur] + 1;
+      dist[ni] = nd;
       prev[ni] = cur;
       q.push(ni);
+      if (
+        nd > bestD ||
+        (nd === bestD && (nx < bestCx || (nx === bestCx && ny < bestCy)))
+      ) {
+        bestD = nd;
+        bestCx = nx;
+        bestCy = ny;
+      }
     }
   }
 
-  return { dist, prev };
+  return {
+    prev,
+    goalCell: { cx: bestCx, cy: bestCy },
+    maxDist: bestD,
+  };
 }
 
 /**
