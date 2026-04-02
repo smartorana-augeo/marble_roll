@@ -1,35 +1,21 @@
 /**
  * Post-processing stages for procedural levels: widen, segment styles, obstacles, track offset, kill plane.
- * Also exports 2D variants (`placeObstacles2D`) used by the side-runner game mode.
+ * Engine layer — no game-config imports. All tuning values are passed by callers.
  *
  * Documentation: **PROCEDURAL_L_SYSTEM_LEVELS.md** (§5, obstacles); **LEVEL_DESIGN_AND_PROCEDURE.md**
- * (§4 reference obstacles, §6 challenge knobs, §8 agency vs width); **THE_LADDER.md** (flavour hazards — roadmap).
+ * (§4 reference obstacles, §6 challenge knobs).
  */
-import {
-  GameplaySettings,
-  procgenMinPlatformHalfXZ,
-  procgenPathHalfXZBase,
-} from '../config/GameplaySettings.js';
-
-const { minStaticCountForGap } = GameplaySettings.procgen;
-
-/** Late-run minimum path half-extent XZ (floor after width decay); matches `GameplaySettings.procgen`. */
-export const MIN_PLATFORM_HALF_XZ = GameplaySettings.procgen.pathPlatformHalfXZFloor;
-
-/** Wide starting pad (world units, half-extent XZ). */
-export const PLAZA_HALF_XZ = GameplaySettings.procgen.plazaHalfXZ;
 
 /**
+ * Enforce a minimum half-extent on platform tiles.
  * @param {object[]} staticEntries
- * @param {number} levelIndex
+ * @param {number}   minXZ  Precomputed minimum half-extent (from game config)
  * @returns {object[]}
  */
-export function widenPlatforms(staticEntries, levelIndex) {
-  const minXZ = procgenMinPlatformHalfXZ(levelIndex);
+export function widenPlatforms(staticEntries, minXZ) {
   return staticEntries.map((e) => {
     if (e.type !== 'box') return e;
     const [hx, hy, hz] = e.halfExtents;
-    /** Ramps use local Z along the slope; only widen cross-path half-extent (X). */
     if (e.materialKey === 'ramp') {
       const nhx = Math.max(minXZ, hx);
       if (nhx === hx) return e;
@@ -43,57 +29,59 @@ export function widenPlatforms(staticEntries, levelIndex) {
 }
 
 /**
- * Deterministic path width and material tags (plaza / path / pathWide) for a floating-course look.
+ * Deterministic path width and material tags (plaza / path / pathWide).
+ *
  * @param {object[]} staticEntries
- * @param {number} levelIndex
+ * @param {number}   levelIndex
+ * @param {{
+ *   plazaHalfXZ:   number,
+ *   baseHalfXZ:    number,
+ *   wideThreshold: number,
+ *   wideDelta:     number,
+ *   wideCap:       number,
+ *   spanMin:       number,
+ *   spanSteps:     number,
+ *   spanStep:      number,
+ * }} styleConfig  All values precomputed from game config for this level
  * @returns {object[]}
  */
-export function applySegmentStyles(staticEntries, levelIndex) {
-  const p = GameplaySettings.procgen;
-  const minXZ = procgenMinPlatformHalfXZ(levelIndex);
-  const wideThreshold = procgenPathHalfXZBase(levelIndex) + p.pathWideOverBase;
+export function applySegmentStyles(staticEntries, levelIndex, styleConfig) {
+  const { plazaHalfXZ, baseHalfXZ, wideThreshold, wideDelta, wideCap, spanMin, spanSteps, spanStep } = styleConfig;
 
   return staticEntries.map((e, i) => {
     if (e.type !== 'box') return e;
-    const [hx, hy, hz] = e.halfExtents;
+    const [, hy] = e.halfExtents;
 
     if (e.materialKey === 'ramp') {
-      const w = pathHalfXZ(levelIndex, i);
-      return { ...e, halfExtents: [Math.max(minXZ, w), hy, hz] };
+      const w = _pathHalfXZ(levelIndex, i, baseHalfXZ, spanMin, spanSteps, spanStep);
+      return { ...e, halfExtents: [Math.max(baseHalfXZ, w), hy, e.halfExtents[2]] };
     }
 
     if (i === 0) {
-      return {
-        ...e,
-        halfExtents: [PLAZA_HALF_XZ, hy, PLAZA_HALF_XZ],
-        materialKey: 'plaza',
-      };
+      return { ...e, halfExtents: [plazaHalfXZ, hy, plazaHalfXZ], materialKey: 'plaza' };
     }
 
-    const w = pathHalfXZ(levelIndex, i);
+    const w = _pathHalfXZ(levelIndex, i, baseHalfXZ, spanMin, spanSteps, spanStep);
     const h2 = (levelIndex * 7919 + i * 13) >>> 0;
-    const wide =
-      h2 % 9 === 0 ? Math.min(p.pathWideCap, w + p.pathWideDelta) : w;
+    const wide = h2 % 9 === 0 ? Math.min(wideCap, w + wideDelta) : w;
     const key = wide > wideThreshold ? 'pathWide' : 'path';
-    return {
-      ...e,
-      halfExtents: [wide, hy, wide],
-      materialKey: key,
-    };
+    return { ...e, halfExtents: [wide, hy, wide], materialKey: key };
   });
 }
 
 /**
  * @param {number} levelIndex
  * @param {number} pathIndex
+ * @param {number} baseHalfXZ
+ * @param {number} spanMin
+ * @param {number} spanSteps
+ * @param {number} spanStep
  * @returns {number}
  */
-function pathHalfXZ(levelIndex, pathIndex) {
-  const p = GameplaySettings.procgen;
-  const base = procgenPathHalfXZBase(levelIndex);
+function _pathHalfXZ(levelIndex, pathIndex, baseHalfXZ, spanMin, spanSteps, spanStep) {
   const h = (levelIndex * 1103515245 + pathIndex * 12345) >>> 0;
-  const span = p.pathHalfXZSpanMin + (h % p.pathHalfXZSpanSteps) * p.pathHalfXZSpanStep;
-  return base + span;
+  const span = spanMin + (h % spanSteps) * spanStep;
+  return baseHalfXZ + span;
 }
 
 /**
@@ -109,7 +97,7 @@ export function computeTrackBaseY(levelIndex) {
  * @param {object[]} staticEntries
  * @param {{ position: number[], radius: number }} startZone
  * @param {{ position: number[], radius: number }} endZone
- * @param {[number, number, number]} spawnBase marble centre before vertical shift
+ * @param {[number, number, number]} spawnBase
  * @param {number} trackBaseY
  */
 export function applyTrackOffset(staticEntries, startZone, endZone, spawnBase, trackBaseY) {
@@ -123,19 +111,11 @@ export function applyTrackOffset(staticEntries, startZone, endZone, spawnBase, t
   const zones = {
     start: {
       radius: startZone.radius,
-      position: [
-        startZone.position[0],
-        startZone.position[1] + trackBaseY,
-        startZone.position[2],
-      ],
+      position: [startZone.position[0], startZone.position[1] + trackBaseY, startZone.position[2]],
     },
     end: {
       radius: endZone.radius,
-      position: [
-        endZone.position[0],
-        endZone.position[1] + trackBaseY,
-        endZone.position[2],
-      ],
+      position: [endZone.position[0], endZone.position[1] + trackBaseY, endZone.position[2]],
     },
   };
 
@@ -149,7 +129,7 @@ export function applyTrackOffset(staticEntries, startZone, endZone, spawnBase, t
 }
 
 /**
- * Lowest underside of solid (colliding) tiles; lattice-only tiles still contribute mesh minY for fog.
+ * Lowest underside of solid tiles; used for kill plane calculation.
  * @param {object[]} staticEntries
  * @returns {number}
  */
@@ -165,30 +145,23 @@ export function computeKillPlaneY(staticEntries) {
 }
 
 /**
- * Inserts 1–2 obstacles: optional jump gap (remove one tile), then a lattice tile (no collider).
- * PROCEDURAL §5.6: at least one and at most two sites; deterministic from `levelIndex` and spine length.
+ * Inserts 1–2 obstacles into a 3D static-entry array: optional jump gap then a lattice tile.
  * @param {object[]} staticEntries
- * @param {number} levelIndex
- * @param {number} expandedLength
+ * @param {number}   levelIndex
+ * @param {number}   expandedLength
+ * @param {number}   minStaticCountForGap  Minimum box count before a gap may be cut
  * @returns {{ static: object[], meta: { latticeIndex: number, gapIndex: number, obstacleCount: number } }}
  */
-export function placeObstacles(staticEntries, levelIndex, expandedLength) {
+export function placeObstacles(staticEntries, levelIndex, expandedLength, minStaticCountForGap) {
   let arr = staticEntries.map((e) => ({ ...e }));
   const n = arr.length;
-  /** @type {{ latticeIndex: number, gapIndex: number, obstacleCount: number }} */
   const meta = { latticeIndex: -1, gapIndex: -1, obstacleCount: 0 };
 
-  if (n < 2) {
-    return { static: arr, meta };
-  }
+  if (n < 2) return { static: arr, meta };
 
-  /** Two tiles only (e.g. degenerate string): lattice the path segment — §5.6 minimum one obstacle. */
   if (n === 2) {
-    const latticeIdx = 1;
-    arr = arr.map((e, i) =>
-      i === latticeIdx ? { ...e, collision: false, lattice: true } : e,
-    );
-    meta.latticeIndex = latticeIdx;
+    arr = arr.map((e, i) => i === 1 ? { ...e, collision: false, lattice: true } : e);
+    meta.latticeIndex = 1;
     meta.obstacleCount = 1;
     return { static: arr, meta };
   }
@@ -210,11 +183,8 @@ export function placeObstacles(staticEntries, levelIndex, expandedLength) {
   const iMax2 = n2 - 2;
 
   if (n2 === 2) {
-    const latticeIdx = 1;
-    arr = arr.map((e, i) =>
-      i === latticeIdx ? { ...e, collision: false, lattice: true } : e,
-    );
-    meta.latticeIndex = latticeIdx;
+    arr = arr.map((e, i) => i === 1 ? { ...e, collision: false, lattice: true } : e);
+    meta.latticeIndex = 1;
     meta.obstacleCount += 1;
     return { static: arr, meta };
   }
@@ -222,9 +192,7 @@ export function placeObstacles(staticEntries, levelIndex, expandedLength) {
   if (iMax2 >= iMin2) {
     const h2 = (hash >> 11) >>> 0;
     const latticeIdx = iMin2 + (h2 % (iMax2 - iMin2 + 1));
-    arr = arr.map((e, i) =>
-      i === latticeIdx ? { ...e, collision: false, lattice: true } : e,
-    );
+    arr = arr.map((e, i) => i === latticeIdx ? { ...e, collision: false, lattice: true } : e);
     meta.latticeIndex = latticeIdx;
     meta.obstacleCount += 1;
   }
@@ -232,24 +200,20 @@ export function placeObstacles(staticEntries, levelIndex, expandedLength) {
   return { static: arr, meta };
 }
 
-// ─── 2D obstacle pass ─────────────────────────────────────────────────────────
-
 /**
- * Deterministically removes one interior platform to create a jump gap.
- * Skips the spawn pad (index 0) and the last platform (which holds the goal trigger).
- * Returns the platforms array unchanged when there are too few platforms for a safe gap.
- *
+ * Deterministically removes one interior platform to create a jump gap (2D mode).
  * @param {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>} platforms
  * @param {number} levelIndex
+ * @param {number} minStaticCountForGap
  * @returns {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>}
  */
-export function placeObstacles2D(platforms, levelIndex) {
+export function placeObstacles2D(platforms, levelIndex, minStaticCountForGap) {
   const n = platforms.length;
   if (n <= minStaticCountForGap) return platforms.map((p) => ({ ...p }));
 
   const arr = platforms.map((p) => ({ ...p }));
-  const iMin = 2;                   // leave spawn pad + first real tile intact
-  const iMax = n - 2;               // leave last tile intact (goal boundary)
+  const iMin = 2;
+  const iMax = n - 2;
   const hash = (levelIndex * 7919 + n * 31) >>> 0;
   const gapIdx = iMin + (hash % (iMax - iMin + 1));
   arr.splice(gapIdx, 1);

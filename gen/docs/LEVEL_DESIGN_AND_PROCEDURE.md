@@ -11,6 +11,7 @@
 | Document | Role |
 |----------|------|
 | [PROCGEN_COMPTON_MATEAS.md](PROCGEN_COMPTON_MATEAS.md) | **Target** procgen methodology (Compton & Mateas 2006) and roadmap from current pipeline |
+| [PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md) | **Planned** grid drunkard-walk layout backend: phases, modules, contracts (not yet implemented) |
 | [PROCEDURAL_L_SYSTEM_LEVELS.md](PROCEDURAL_L_SYSTEM_LEVELS.md) | **Implementation** spec: current L-system pipeline, turtle, descriptor contract |
 | [../specs/SPEC.md](../specs/SPEC.md) | **Technical** contract: stack, commands, level bundle, MVP scope |
 | [THE_LADDER.md](THE_LADDER.md) | **Creative direction**: corporate ladder theme, flavour hazards |

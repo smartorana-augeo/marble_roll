@@ -4,7 +4,7 @@
 **Code:** `game/procgen/` in the `marble_roll` project  
 **Status:** The **full pipeline** in §2 (expand **main spine** → budgets → **`preferRampsOverStepJumps`** → **`applyLevelMapSplices`** → turtle → widen → **`applySegmentStyles`** → obstacles → offset) is **implemented** and **normative**. **§§3.4–3.7** (turn budget, vertical budget, ramp preference, **level-map splices**), **§4** (turtle alphabet including **`r`**), **§§5.1–5.7** (widths, zones, descriptor, **`trackBaseY`**, obstacles), **`procgenMeta`** (§5.4), and **§5.8** (road presentation in `LevelLoader`, optional textures) are **normative** for compatibility and QA replays.
 
-**Relationship to design methodology:** `LEVEL_DESIGN_AND_PROCEDURE.md` describes **goals** (skills, affordances, obstacle vocabulary, agency, roadmap). **`PROCGEN_COMPTON_MATEAS.md`** tracks adoption of Compton & Mateas (AIIDE 2006): **rhythm motifs**, **connectivity**, and future hierarchy work. **This document** describes **what the code does today** — by default **`composeRhythmSpineString`** (motif concatenation) or **legacy** `expandLSystem`, then the same budgets → splices → turtle → post-process chain; **`connectivityAudit`** may **repair** the spine string before obstacles. Future refactors should update **both** documents when behaviour changes.
+**Relationship to design methodology:** `LEVEL_DESIGN_AND_PROCEDURE.md` describes **goals** (skills, affordances, obstacle vocabulary, agency, roadmap). **`PROCGEN_COMPTON_MATEAS.md`** tracks adoption of Compton & Mateas (AIIDE 2006): **rhythm motifs**, **connectivity**, and future hierarchy work. **`PROCEDURAL_DRUNKARD_GRID_SPEC.md`** specifies a planned **grid drunkard-walk** layout backend (not yet implemented) that would **replace the spine source** while keeping the same turtle and post-process chain. **This document** describes **what the code does today** — by default **`composeRhythmSpineString`** (motif concatenation) or **legacy** `expandLSystem`, then the same budgets → splices → turtle → post-process chain; **`connectivityAudit`** may **repair** the spine string before obstacles. Future refactors should update **both** documents when behaviour changes.
 
 ---
 
@@ -59,7 +59,7 @@ flowchart TB
 **Bootstrap vs procgen:** **`loadRoadTextures`** runs **once** after the manifest is fetched; it does **not** read the L-string and does **not** affect **`generateProcgenDescriptor`**. It only populates optional **`THREE.Texture`** references on the materials object passed into **`LevelLoader.build`**. If loading fails, **`roadStraight`** is absent and §5.8 fallback applies.
 
 1. **`levels.json`** supplies `procgen: true`, optional **`levelCount`** (finite run), optional **`infiniteLevels`** (procgen run does not end after `levelCount`), and `schemaVersion` (read before first level; same fetch is the entry point for the procgen pipeline below). The HUD uses **1-based numeric labels** from the level index, not a name list.
-2. **Spine string:** **`composeRhythmSpineString`** (default) or **`expandLSystem`** with the axiom and **non-branching** spine rules (§3.2) — one **main forward** route. A **connectivity audit** (`auditStaticPathGaps`) runs after the turtle; failed audits **append** forward symbols to the core and **rebuild** (capped by **`comptonRhythmRepairMaxPasses`**).
+2. **Spine string:** if **`GameplaySettings.procgen.layoutBackend === 'gridDrunkard'`** (default), the spine comes from the **drunkard grid** pipeline ([PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md)); otherwise **`composeRhythmSpineString`** or **`expandLSystem`** with the axiom and **non-branching** spine rules (§3.2) — one **main forward** route. A **connectivity audit** (`auditStaticPathGaps`) runs after the turtle; failed audits **append** forward symbols to the core and **rebuild** (capped by **`comptonRhythmRepairMaxPasses`**).
 3. **Budget passes** (§§3.4–3.5) may **append** **`+`/`-`** and **`r`** symbols so **turn** and **vertical** minimums are met **deterministically**.
 4. **`preferRampsOverStepJumps`** may rewrite many **`^F`** pairs into **`r`** (sloped ramp) for a clearer **floating-course** read.
 5. **`applyLevelMapSplices`** (§3.7) **does nothing** on **`levelIndex === 0`**. On later rungs it inserts **`^`** / **`v`** bursts so the **tail** of the path shifts vertically by ~**jump clearance** at each **splice site** (platforms are built on the resulting polyline in §4).
@@ -74,8 +74,9 @@ flowchart TB
 
 | Stage | Module |
 |--------|--------|
-| Rhythm spine (default) | `comptonRhythm.js` |
-| Expand (legacy) | `lSystemExpand.js` |
+| Grid drunkard layout (default spine source) | `gridSpinePipeline.js`, `drunkardGrid.js`, `gridTopology.js`, `gridToSpine.js` |
+| Rhythm spine (`layoutBackend: 'legacyRhythm'`) | `comptonRhythm.js` |
+| Expand (legacy, with `legacyRhythm` and `useComptonRhythmLayer: false`) | `lSystemExpand.js` |
 | Connectivity audit | `connectivityAudit.js` |
 | Turn / vertical budgets, **`preferRampsOverStepJumps`**, **`applyLevelMapSplices`** | `lSystemPostExpand.js` |
 | Turtle + ramp box helper | `lSystemTurtlePlatforms.js`, `rampOrientation.js` |
@@ -91,6 +92,7 @@ flowchart TB
 |----------|------|
 | **LEVEL_DESIGN_AND_PROCEDURE.md** | Design methodology — skills, affordances, obstacle reference, challenge, agency, roadmap. |
 | **PROCGEN_COMPTON_MATEAS.md** | Target procgen overhaul (Compton & Mateas 2006): rhythm, repetition, connectivity; migration from this pipeline. |
+| **PROCEDURAL_DRUNKARD_GRID_SPEC.md** | Planned grid drunkard-walk layout backend: phased pipeline, module split, contracts (not yet implemented). |
 | **PROCEDURAL_L_SYSTEM_LEVELS.md** (this file) | Normative pipeline, symbols, descriptor fields, presentation §5.8. |
 | **THE_LADDER.md** | Creative direction — corporate ladder theme; future hazards evaluated against the level-design doc. |
 

@@ -10,18 +10,27 @@ A build is hosted on GitHub Pages:
 
 ## Run locally
 
-From this directory (`marble_roll`):
+From this directory (`marble_roll`), serve over HTTP (ES modules need it).
+
+**Python** (if installed and on `PATH`):
 
 ```bash
 python -m http.server 8765
 ```
 
-Then open [http://localhost:8765/](http://localhost:8765/) in your browser.
-
-On some systems the interpreter is `python3` instead of `python`:
+On some systems the interpreter is `python3`, or on Windows the launcher is `py`:
 
 ```bash
 python3 -m http.server 8765
+py -m http.server 8765
 ```
+
+**Node.js** (no Python required):
+
+```bash
+npx --yes serve -p 8765
+```
+
+Then open [http://localhost:8765/](http://localhost:8765/) in your browser.
 
 To stop the server, press `Ctrl+C` in the terminal.

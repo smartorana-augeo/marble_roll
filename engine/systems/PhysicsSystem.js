@@ -1,6 +1,10 @@
+/**
+ * Physics systems for both 3D (cannon-es) and 2D (AABB) game modes.
+ * Engine layer — imports only external libraries and engine-internal modules.
+ * Gravity for 2D is passed by the caller; no game-config imports.
+ */
 import { Body, RaycastResult, Sphere, Vec3, World } from 'cannon-es';
 import { Player } from '../player/Player.js';
-import { ControlSettings } from '../config/ControlSettings.js';
 
 const FIXED_HZ = 60;
 const FIXED_TIMESTEP = 1 / FIXED_HZ;
@@ -19,7 +23,12 @@ export class PhysicsSystem {
     this._rayFrom = new Vec3();
     this._rayTo = new Vec3();
     this._jumpImpulse = new Vec3();
+
+    /** @type {Player | null} */
+    this._player2d = null;
   }
+
+  // ─── 3D marble physics ────────────────────────────────────────────────────
 
   /**
    * Short ray under the marble: grounded if we hit static geometry within reach (not the marble).
@@ -99,16 +108,18 @@ export class PhysicsSystem {
   // ─── 2D side-runner physics ───────────────────────────────────────────────
 
   /** @type {Player | null} */
-  get player() { return this._player2d ?? null; }
+  get player() { return this._player2d; }
 
   /**
    * Create (or replace) the 2D player entity.
    * @param {number} x
    * @param {number} y  Bottom (feet) Y in world / canvas coordinates
+   * @param {number} [width=24]
+   * @param {number} [height=36]
    * @returns {Player}
    */
-  createPlayer(x, y) {
-    this._player2d = new Player(x, y);
+  createPlayer(x, y, width = 24, height = 36) {
+    this._player2d = new Player(x, y, width, height);
     return this._player2d;
   }
 
@@ -132,7 +143,7 @@ export class PhysicsSystem {
 
   /**
    * Apply an upward jump impulse if the player is currently grounded.
-   * @param {number} force  Initial vy to set (negative = upward)
+   * @param {number} force  Initial vy to set (negative = upward in canvas coords)
    */
   applyJump(force) {
     if (!this._player2d?.grounded) return;
@@ -142,14 +153,15 @@ export class PhysicsSystem {
 
   /**
    * Advance 2D physics one frame: gravity, movement, AABB platform collisions.
-   * @param {number} dt  Seconds
+   * @param {number} dt        Seconds
    * @param {Array<{x:number,y:number,w:number,h:number,collision?:boolean}>} platforms
+   * @param {number} gravity   Acceleration in world px / s² (positive = downward)
    */
-  step2D(dt, platforms) {
+  step2D(dt, platforms, gravity) {
     const p = this._player2d;
     if (!p) return;
 
-    p.vy += ControlSettings.gravity2d * dt;
+    p.vy += gravity * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.grounded = false;

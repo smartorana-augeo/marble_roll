@@ -2,7 +2,7 @@
 
 **Document type:** design specification (normative for generator evolution)  
 **Status:** **partially implemented** — motif **rhythm layer** (`game/procgen/comptonRhythm.js`), **connectivity audit** (`connectivityAudit.js`), and a **repair loop** in `generateProcgenDescriptor.js` are wired behind `GameplaySettings.procgen.useComptonRhythmLayer` (default **on**). The paper’s full **four-layer hierarchy** and deeper physics validation are **not** yet in code.  
-**Companion:** [LEVEL_DESIGN_AND_PROCEDURE.md](LEVEL_DESIGN_AND_PROCEDURE.md), [PROCEDURAL_L_SYSTEM_LEVELS.md](PROCEDURAL_L_SYSTEM_LEVELS.md)
+**Companion:** [LEVEL_DESIGN_AND_PROCEDURE.md](LEVEL_DESIGN_AND_PROCEDURE.md), [PROCEDURAL_L_SYSTEM_LEVELS.md](PROCEDURAL_L_SYSTEM_LEVELS.md), [PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md) (planned grid layout backend)
 
 ---
 

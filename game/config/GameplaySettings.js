@@ -38,9 +38,33 @@
  * @property {number} connectivityMaxGapFactor Max horizontal centre–centre gap between consecutive path boxes vs turtle `step` (audit after turtle).
  * @property {number} comptonRhythmRepairMaxPasses When the audit fails, append forward symbols to the core and rebuild (capped).
  * @property {number} legacyLSystemMaxLength Safety cap on expanded string length when `useComptonRhythmLayer` is false.
+ * @property {'gridDrunkard'|'legacyRhythm'} layoutBackend Spine layout: **gridDrunkard** (default) or legacy rhythm / L-system string.
+ * @property {object} grid Drunkard-walk grid sizing and behaviour — see `gen/docs/PROCEDURAL_DRUNKARD_GRID_SPEC.md`.
+ * @property {object} gridToSpine Emission: leading `F` run-up and **90°** turns for grid layouts.
  */
 
 export const GameplaySettings = {
+  /**
+   * 2D side-runner procgen geometry tuning (world px units).
+   * Used by `lSystemTurtlePlatforms2D` and the `'2d'` branch of `generateProcgenDescriptor`.
+   */
+  procgen2d: {
+    /** Width of one flat platform tile. */
+    tileW: 120,
+    /** Height (thickness) of platform tiles. */
+    tileH: 20,
+    /** Horizontal distance of a gap symbol (`+` / `-`). */
+    gapW: 90,
+    /** Vertical rise/drop per `^`, `v`, or `r` symbol. */
+    verticalStep: 72,
+    /** Y coordinate (canvas, top-surface) of the ground-floor level. */
+    baselineY: 400,
+    /** Max repair passes when connectivity audit fails. */
+    comptonRhythmRepairMaxPasses: 4,
+    /** Kill plane: this many px below `baselineY`. */
+    killPlanePadding: 380,
+  },
+
   /** Procedural level path width, presentation thresholds, and related tuning. */
   procgen: {
     pathPlatformHalfXZFloor: 1.08,
@@ -83,6 +107,50 @@ export const GameplaySettings = {
     comptonRhythmRepairMaxPasses: 5,
     /** Only used when `useComptonRhythmLayer` is false. */
     legacyLSystemMaxLength: 120_000,
+
+    /**
+     * **gridDrunkard** — floor grid + drunkard walk + rooms + branches, then BFS main path → spine.  
+     * **legacyRhythm** — `composeRhythmSpineString` / `expandLSystem` as before (3D only).
+     */
+    layoutBackend: 'gridDrunkard',
+
+    /**
+     * When `layoutBackend === 'gridDrunkard'`, skip `ensureTurnBudget`, `ensureVerticalBudget`, and
+     * `applyLevelMapSplices` so the spine is not rewritten after grid emission; `preferRampsOverStepJumps` still runs.
+     */
+    gridSkipHeavyPostExpand: true,
+
+    grid: {
+      widthMin: 28,
+      widthMax: 44,
+      heightMin: 28,
+      heightMax: 44,
+      /** Probability of a 90° turn each main-walk step. */
+      pTurn: 0.08,
+      /** Probability of attempting a room carve after a corridor step (in addition to `roomPeriod`). */
+      pRoom: 0.12,
+      /** Attempt a room every this many steps (0 = period disabled). */
+      roomPeriod: 6,
+      /** After a room is placed, enqueue a branch seed with this probability. */
+      pBranch: 0.55,
+      /** Base corridor steps; scaled slightly with `levelIndex`. */
+      mainStepsBase: 110,
+      mainStepsPerLevel: 8,
+      roomHalfMin: 2,
+      roomHalfMax: 4,
+      /** Minimum fraction of uncarved cells in a room rectangle for placement. */
+      roomUncarvedMinFraction: 0.72,
+      branchStepsMax: 28,
+      /** Inbound margin so rooms stay away from the outer wall. */
+      edgeMargin: 2,
+    },
+
+    gridToSpine: {
+      /** Extra `F` symbols after initial yaw alignment (turtle already places a spawn plaza). */
+      leadingFCount: 1,
+      /** Use **π/2** rad per `+`/`−` so grid edges match cardinal moves. */
+      useRightAngle: true,
+    },
   },
 };
 
