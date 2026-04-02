@@ -183,6 +183,20 @@ export const GameplaySettings = {
       gapHoverBonus: 0.18,
     },
   },
+
+  /**
+   * Feature toggles grouped for convenience; see each key for dev-only vs all players.
+   */
+  dev: {
+    /**
+     * Run-over screen: show “restart this level” only when **dev mode** is enabled on the menu.
+     * Clears falls and reloads the current level index. Set false to hide even in dev mode.
+     */
+    runGameOverRestartCurrentLevelClearsFalls: true,
+  },
+
+  /** Run-wide: falls allowed before the run game-over screen; HUD shows this many fall markers. */
+  runMaxFalls: 3,
 };
 
 /**

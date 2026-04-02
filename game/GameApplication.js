@@ -7,7 +7,19 @@ import { LevelLoader } from './level/LevelLoader.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { PhysicsSystem } from './systems/PhysicsSystem.js';
 import { UISystem } from './systems/UISystem.js';
+import { MusicPlaylist } from '../engine/audio/MusicPlaylist.js';
+import { AssetSettings } from './config/AssetSettings.js';
+import { AudioSettings, loadStoredMuted } from './config/AudioSettings.js';
 import { ControlSettings } from './config/ControlSettings.js';
+import { applyControlBindingsToMenuKeys, DisplaySettings } from './config/DisplaySettings.js';
+import { GameplaySettings } from './config/GameplaySettings.js';
+import { SceneLightingSettings } from './config/SceneLightingSettings.js';
+import { applyPixelWorldMapsToMaterials } from './rendering/pixelWorldMaps.js';
+import { createCoinHologramMaterial } from './rendering/coinHologramMaterial.js';
+import { setupSceneLighting } from './rendering/setupSceneLighting.js';
+import { WorldNeonPulse } from './rendering/worldNeonPulse.js';
+import { wireMuteButtons } from './ui/wireMuteButtons.js';
+import { wireCreditsOverlay } from './ui/wireCredits.js';
 import { generateProcgenDescriptor } from './procgen/generateProcgenDescriptor.js';
 import { yieldToPaint } from './util/yieldToPaint.js';
 import { CoinPickupRuntime } from './collectibles/CoinPickupRuntime.js';
@@ -69,6 +81,17 @@ export class GameApplication {
     this.coinRuntime = new CoinPickupRuntime();
     this.coinLedger = new RunCoinLedger();
 
+    this.music = new MusicPlaylist(AssetSettings.music.trackUrls, {
+      initialMuted: loadStoredMuted(),
+      onMutedChange: (muted) => {
+        try {
+          localStorage.setItem(AudioSettings.storageKey, muted ? '1' : '0');
+        } catch (_) {
+          /* ignore */
+        }
+      },
+    });
+
     /** @type {{ schemaVersion: number, levels: object[] } | null} */
     this.bundle = null;
     this.session = {
@@ -94,11 +117,14 @@ export class GameApplication {
     this._onEmbedPointerDown = null;
     /** Prevents overlapping async level loads (New game / next level / debug load). */
     this._levelLoadInProgress = false;
+    /** @type {{ sync: () => void } | null} */
+    this._syncMuteUi = null;
+    /** Falls this run; resets on new run or main menu (not on level advance). */
+    this._fallCount = 0;
 
     this.scene = new THREE.Scene();
     /** Sky colour comes from CSS starfield behind the canvas (`alpha: true`). */
     this.scene.background = null;
-    this.scene.fog = new THREE.Fog(0x133e7c, 24, 92);
 
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
     this.camera.position.set(0, 10, 16);
@@ -115,53 +141,55 @@ export class GameApplication {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    setupSceneLighting(this.scene, SceneLightingSettings);
+
     this._materials = {
       static: new THREE.MeshStandardMaterial({
         color: 0x711c91,
-        roughness: 0.72,
-        metalness: 0.18,
+        roughness: 0.96,
+        metalness: 0.03,
         emissive: 0x2a0d38,
-        emissiveIntensity: 0.12,
+        emissiveIntensity: 0.07,
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
       }),
       plaza: new THREE.MeshStandardMaterial({
         color: 0x711c91,
-        roughness: 0.68,
-        metalness: 0.2,
+        roughness: 0.94,
+        metalness: 0.04,
         emissive: 0x3d1560,
-        emissiveIntensity: 0.18,
+        emissiveIntensity: 0.1,
         polygonOffset: true,
         polygonOffsetFactor: 3,
         polygonOffsetUnits: 1,
       }),
       path: new THREE.MeshStandardMaterial({
         color: 0x711c91,
-        roughness: 0.7,
-        metalness: 0.2,
+        roughness: 0.96,
+        metalness: 0.04,
         emissive: 0x2a0d38,
-        emissiveIntensity: 0.1,
+        emissiveIntensity: 0.06,
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
       }),
       pathWide: new THREE.MeshStandardMaterial({
         color: 0xea00d9,
-        roughness: 0.58,
-        metalness: 0.28,
+        roughness: 0.9,
+        metalness: 0.06,
         emissive: 0x6b0062,
-        emissiveIntensity: 0.22,
+        emissiveIntensity: 0.12,
         polygonOffset: true,
         polygonOffsetFactor: 2,
         polygonOffsetUnits: 1,
       }),
       ramp: new THREE.MeshStandardMaterial({
         color: 0xea00d9,
-        roughness: 0.6,
-        metalness: 0.22,
+        roughness: 0.92,
+        metalness: 0.05,
         emissive: 0x5c0054,
-        emissiveIntensity: 0.15,
+        emissiveIntensity: 0.09,
         polygonOffset: true,
         polygonOffsetFactor: 2,
         polygonOffsetUnits: 1,
@@ -199,24 +227,15 @@ export class GameApplication {
       lattice: new THREE.MeshStandardMaterial({
         color: 0x0abdc6,
         wireframe: true,
-        metalness: 0.35,
-        roughness: 0.55,
+        metalness: 0.1,
+        roughness: 0.9,
         emissive: 0x045a61,
-        emissiveIntensity: 0.25,
+        emissiveIntensity: 0.16,
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
       }),
-      coin: new THREE.MeshStandardMaterial({
-        color: 0xe0ffff,
-        emissive: 0x00fff2,
-        emissiveIntensity: 1.65,
-        roughness: 0.12,
-        metalness: 0.45,
-        polygonOffset: true,
-        polygonOffsetFactor: -0.8,
-        polygonOffsetUnits: -1,
-      }),
+      coin: createCoinHologramMaterial(),
       marble: new THREE.MeshStandardMaterial({
         color: 0xfff59a,
         roughness: 0.14,
@@ -226,25 +245,16 @@ export class GameApplication {
       }),
     };
 
+    this._pixelWorldNoiseTexture = applyPixelWorldMapsToMaterials(this._materials);
+
+    this._worldNeonPulse = new WorldNeonPulse();
+    this._worldNeonPulse.capture(this._materials);
+
     const marbleGeo = new THREE.SphereGeometry(this.physics.marbleRadius, 40, 32);
     this.marbleMesh = new THREE.Mesh(marbleGeo, this._materials.marble);
     this.marbleMesh.castShadow = true;
     this.marbleMesh.receiveShadow = false;
     this.scene.add(this.marbleMesh);
-
-    const hemi = new THREE.HemisphereLight(0x4a2a6b, 0x091833, 0.48);
-    this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffe8ff, 0.92);
-    sun.position.set(18, 32, 12);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 120;
-    sun.shadow.camera.left = -40;
-    sun.shadow.camera.right = 40;
-    sun.shadow.camera.top = 40;
-    sun.shadow.camera.bottom = -40;
-    this.scene.add(sun);
 
     /** Orbit angles (rad); independent of marble roll. */
     this._cameraYaw = ControlSettings.camera.initialYaw;
@@ -282,7 +292,20 @@ export class GameApplication {
     }
     this._registerCommands();
     this._wireUi();
+    this._syncMuteUi = wireMuteButtons(this.music);
+    wireCreditsOverlay();
+    /** Load first playlist track; playback still needs a user gesture (see unlock listener below). */
+    this.music.ensureInitialTrack();
+    const uiRoot = document.getElementById('ui-root');
+    uiRoot?.addEventListener(
+      'pointerdown',
+      () => {
+        this.music.ensurePlayback();
+      },
+      { once: true, capture: true },
+    );
     this._hydrateBundleFromInlineManifest();
+    this._applyDisplayBranding();
     this.ui.setMenuManifestLoading(!this.bundle);
     this._loop.start();
 
@@ -306,6 +329,16 @@ export class GameApplication {
   /**
    * Parsed from `index.html` so the game can boot even when `fetch('levels/levels.json')` never runs.
    */
+  _applyDisplayBranding() {
+    if (typeof document === 'undefined') return;
+    document.title = DisplaySettings.gameTitle;
+    const heading = document.getElementById('menu-heading');
+    if (heading) heading.textContent = DisplaySettings.gameTitle;
+    const tagline = document.getElementById('menu-subtitle');
+    if (tagline) tagline.textContent = DisplaySettings.menuTagline;
+    applyControlBindingsToMenuKeys(document.getElementById('menu-keys'));
+  }
+
   _hydrateBundleFromInlineManifest() {
     const el = document.getElementById('marble-level-manifest');
     const raw = el?.textContent?.trim();
@@ -382,8 +415,9 @@ export class GameApplication {
         );
         return;
       }
-      this._devMode = !!this.ui.devModeCheckbox?.checked;
+      this._syncDevModeFromCheckbox();
       this.coinLedger.startNewRun();
+      this._fallCount = 0;
       this.session.currentLevelIndex = 0;
       console.log('[marble:flow] ④ calling _runLevelLoadFlow(0)');
       void this._runLevelLoadFlow(this.session.currentLevelIndex, () => {
@@ -417,15 +451,33 @@ export class GameApplication {
       }
     });
 
-    this.queue.register('MARBLE_DIED', () => {
-      if (!this.states.is('playing')) return;
-      this.states.setState('marbleDead');
-      const body = this.physics.marbleBody;
-      if (body) {
-        body.velocity.set(0, 0, 0);
-        body.angularVelocity.set(0, 0, 0);
-      }
-      this.ui.showMarbleDead();
+    this.queue.register('RESTART_RUN', () => {
+      if (!this.states.is('runGameOver')) return;
+      if (!this.bundle) return;
+      if (this._levelLoadInProgress) return;
+      this._fallCount = 0;
+      this.coinLedger.startNewRun();
+      this.session.currentLevelIndex = 0;
+      void this._runLevelLoadFlow(this.session.currentLevelIndex, () => {
+        this.states.setState('playing');
+        this._focusPlay();
+      });
+    });
+
+    this.queue.register('DEV_RESTART_RUN_AT_CURRENT_LEVEL', () => {
+      if (!GameplaySettings.dev.runGameOverRestartCurrentLevelClearsFalls) return;
+      this._syncDevModeFromCheckbox();
+      if (!this._devMode) return;
+      if (!this.states.is('runGameOver')) return;
+      if (!this.bundle) return;
+      if (this._levelLoadInProgress) return;
+      const idx = this.session.currentLevelIndex;
+      this._fallCount = 0;
+      this.coinLedger.startNewRun();
+      void this._runLevelLoadFlow(idx, () => {
+        this.states.setState('playing');
+        this._focusPlay();
+      });
     });
 
     this.queue.register('ADVANCE_LEVEL', () => {
@@ -444,6 +496,7 @@ export class GameApplication {
       } else {
         this.session.currentLevelIndex = 0;
         this.coinLedger.startNewRun();
+        this._fallCount = 0;
         this.coinRuntime.clear();
         this.levelLoader.clear(this.physics.world, this.scene);
         this.physics.removeMarble();
@@ -491,6 +544,7 @@ export class GameApplication {
 
     this.queue.register('RETURN_TO_MENU', () => {
       this.coinLedger.startNewRun();
+      this._fallCount = 0;
       this.coinRuntime.clear();
       this.levelLoader.clear(this.physics.world, this.scene);
       this.physics.removeMarble();
@@ -530,6 +584,7 @@ export class GameApplication {
     );
     this.ui.btnNewGame?.addEventListener('click', () => {
       console.log('[marble:flow] ② click on New game');
+      this.music.ensurePlayback();
       this._enqueueAndDrain({ type: 'START_GAME' });
     });
     this.ui.btnContinue?.addEventListener('click', () => {
@@ -537,6 +592,17 @@ export class GameApplication {
     });
     this.ui.btnTryAgain?.addEventListener('click', () => {
       this._enqueueAndDrain({ type: 'RESTART_LEVEL' });
+    });
+    this.ui.btnRunRestart?.addEventListener('click', () => {
+      this.music.ensurePlayback();
+      this._enqueueAndDrain({ type: 'RESTART_RUN' });
+    });
+    this.ui.btnRunMenu?.addEventListener('click', () => {
+      this._enqueueAndDrain({ type: 'RETURN_TO_MENU' });
+    });
+    this.ui.btnDevRunRestartCurrentLevel?.addEventListener('click', () => {
+      this.music.ensurePlayback();
+      this._enqueueAndDrain({ type: 'DEV_RESTART_RUN_AT_CURRENT_LEVEL' });
     });
     this.ui.btnDevSkip?.addEventListener('click', () => {
       if (!this._devMode || !this.states.is('playing')) return;
@@ -547,11 +613,21 @@ export class GameApplication {
     });
   }
 
+  _syncDevModeFromCheckbox() {
+    this._devMode = !!this.ui.devModeCheckbox?.checked;
+  }
+
   _focusPlay() {
+    this._syncDevModeFromCheckbox();
     const name = formatLevelLabel(this.session.currentLevelIndex);
     this.ui.showPlaying(name, this._devMode);
     this._refreshCoinHud();
+    this._refreshFallHud();
     this.canvas?.focus();
+  }
+
+  _refreshFallHud() {
+    this.ui.setFallHud(this._fallCount);
   }
 
   _refreshCoinHud() {
@@ -647,8 +723,31 @@ export class GameApplication {
   }
 
   _resetCameraOrbit() {
-    this._cameraYaw = ControlSettings.camera.initialYaw;
-    this._cameraPitch = ControlSettings.camera.initialPitch;
+    const cam = ControlSettings.camera;
+    this._cameraPitch = cam.initialPitch;
+
+    if (!this._goal || !this._spawn) {
+      this._cameraYaw = cam.initialYaw;
+      return;
+    }
+
+    const sx = this._spawn[0];
+    const sz = this._spawn[2];
+    const gx = this._goal.position.x;
+    const gz = this._goal.position.z;
+    const dx = gx - sx;
+    const dz = gz - sz;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-3) {
+      this._cameraYaw = cam.initialYaw;
+      return;
+    }
+
+    const nx = dx / len;
+    const nz = dz / len;
+    /** Horizontal yaw so orbit sits opposite course direction (camera looks past marble toward end). */
+    const yawAlongCourse = Math.atan2(nx, nz);
+    this._cameraYaw = yawAlongCourse + cam.endZoneClockYawOffsetRad;
   }
 
   /**
@@ -685,6 +784,7 @@ export class GameApplication {
     this.coinLedger.beginLevel(Array.isArray(descriptor.coins) ? descriptor.coins.length : 0);
     this._syncMarbleMesh();
     this._refreshCoinHud();
+    this.music.ensurePlayback();
   }
 
   _onResize() {
@@ -703,9 +803,7 @@ export class GameApplication {
     this._enqueueInputCommands();
     this.queue.drain(16);
 
-    if (this.states.is('playing')) {
-      this.physics.step(deltaSeconds);
-    }
+    this._worldNeonPulse.update(deltaSeconds, this._materials);
 
     if (this.states.is('playing')) {
       if (this._embedFirstInteractionPending) {
@@ -714,9 +812,11 @@ export class GameApplication {
           notifyFirstInteraction();
         }
       }
+      /** Orbit input before follow; roll torque / brake / jump must run *before* {@link PhysicsSystem.step}. */
       this._applyCameraControls(deltaSeconds);
-      this._updateCamera();
       this._applyMarbleControls(deltaSeconds);
+      this.physics.step(deltaSeconds);
+      this._updateCamera();
       this._checkWinCondition();
       this._checkFall();
       const body = this.physics.marbleBody;
@@ -740,6 +840,19 @@ export class GameApplication {
   _enqueueInputCommands() {
     const { input, states, queue } = this;
 
+    if (
+      input.wasPressedEdge('KeyM') &&
+      (states.is('menu') ||
+        states.is('playing') ||
+        states.is('marbleDead') ||
+        states.is('runGameOver') ||
+        states.is('levelComplete'))
+    ) {
+      this.music.toggleMuted();
+      this._syncMuteUi?.sync();
+      this.music.ensurePlayback();
+    }
+
     if (states.is('menu')) {
       if (input.wasPressedEdge('Enter')) queue.enqueue({ type: 'START_GAME' });
       return;
@@ -747,6 +860,11 @@ export class GameApplication {
 
     if (states.is('levelComplete')) {
       if (input.wasPressedEdge('Enter')) queue.enqueue({ type: 'ADVANCE_LEVEL' });
+      if (input.wasPressedEdge('Escape')) queue.enqueue({ type: 'RETURN_TO_MENU' });
+      return;
+    }
+
+    if (states.is('runGameOver')) {
       if (input.wasPressedEdge('Escape')) queue.enqueue({ type: 'RETURN_TO_MENU' });
       return;
     }
@@ -898,9 +1016,34 @@ export class GameApplication {
   _checkFall() {
     const body = this.physics.marbleBody;
     if (!body) return;
-    if (body.position.y < this._killPlaneY) {
-      this.queue.enqueue({ type: 'MARBLE_DIED' });
+    if (body.position.y >= this._killPlaneY) return;
+    /**
+     * Apply immediately — do not enqueue `MARBLE_DIED`. Several events can drain in one batch; the
+     * first sets `marbleDead`, so later copies see `!playing` and skip, under-counting falls.
+     */
+    this._handleMarbleFallDeath();
+  }
+
+  /**
+   * Run-wide fall: increments count, run game over at {@link GameplaySettings.runMaxFalls}, else marble dead UI.
+   */
+  _handleMarbleFallDeath() {
+    if (!this.states.is('playing')) return;
+    this._fallCount += 1;
+    this.ui.setFallHud(this._fallCount);
+    const body = this.physics.marbleBody;
+    if (body) {
+      body.velocity.set(0, 0, 0);
+      body.angularVelocity.set(0, 0, 0);
     }
+    const max = GameplaySettings.runMaxFalls;
+    if (this._fallCount >= max) {
+      this.states.setState('runGameOver');
+      this.ui.showRunGameOver();
+      return;
+    }
+    this.states.setState('marbleDead');
+    this.ui.showMarbleDead();
   }
 
   _syncMarbleMesh() {

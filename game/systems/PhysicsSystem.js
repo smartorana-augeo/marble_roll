@@ -2,6 +2,8 @@ import { Body, RaycastResult, Sphere, Vec3, World } from 'cannon-es';
 
 const FIXED_HZ = 60;
 const FIXED_TIMESTEP = 1 / FIXED_HZ;
+/** Allow enough substeps when frames hitch (e.g. tab focus); low values leave time unsimulated → jitter. */
+const MAX_SUB_STEPS = 10;
 
 export class PhysicsSystem {
   constructor() {
@@ -58,8 +60,8 @@ export class PhysicsSystem {
     const shape = new Sphere(this.marbleRadius);
     const body = new Body({
       mass: 2,
-      linearDamping: 0.08,
-      angularDamping: 0.12,
+      linearDamping: 0.065,
+      angularDamping: 0.09,
       material: undefined,
     });
     body.addShape(shape);
@@ -91,6 +93,6 @@ export class PhysicsSystem {
    * @param {number} deltaSeconds
    */
   step(deltaSeconds) {
-    this.world.step(FIXED_TIMESTEP, deltaSeconds, 3);
+    this.world.step(FIXED_TIMESTEP, deltaSeconds, MAX_SUB_STEPS);
   }
 }

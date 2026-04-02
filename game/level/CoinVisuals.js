@@ -7,7 +7,7 @@ export const COIN_PICKUP_RADIUS = 0.46;
  * Instantiates coin meshes (shared geometry). Caller owns disposal via {@link releaseCoinMeshes}.
  *
  * @param {THREE.Scene} scene
- * @param {{ coin: THREE.MeshStandardMaterial }} materials
+ * @param {{ coin: THREE.MeshStandardMaterial | THREE.ShaderMaterial }} materials
  * @param {{ id: string, position: number[] }[]} coins
  * @returns {{ entries: { id: string, mesh: THREE.Mesh }[], geometry: THREE.BufferGeometry | null }}
  */
@@ -20,12 +20,13 @@ export function addCoinMeshes(scene, materials, coins) {
   const mat = materials.coin;
   /** @type {{ id: string, mesh: THREE.Mesh }[]} */
   const entries = [];
+  const hologram = Boolean(mat.userData?.hologramUniforms);
 
   for (const c of coins) {
     const mesh = new THREE.Mesh(geometry, mat);
     mesh.position.set(c.position[0], c.position[1], c.position[2]);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = !hologram;
+    mesh.receiveShadow = !hologram;
     scene.add(mesh);
     entries.push({ id: c.id, mesh });
   }

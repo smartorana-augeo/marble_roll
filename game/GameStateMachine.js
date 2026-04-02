@@ -3,19 +3,19 @@
  */
 export class GameStateMachine {
   constructor() {
-    /** @type {'menu' | 'playing' | 'levelComplete' | 'marbleDead'} */
+    /** @type {'menu' | 'playing' | 'levelComplete' | 'marbleDead' | 'runGameOver'} */
     this.state = 'menu';
   }
 
   /**
-   * @param {'menu' | 'playing' | 'levelComplete' | 'marbleDead'} next
+   * @param {'menu' | 'playing' | 'levelComplete' | 'marbleDead' | 'runGameOver'} next
    */
   setState(next) {
     this.state = next;
   }
 
   /**
-   * @param {'menu' | 'playing' | 'levelComplete' | 'marbleDead'} s
+   * @param {'menu' | 'playing' | 'levelComplete' | 'marbleDead' | 'runGameOver'} s
    */
   is(s) {
     return this.state === s;

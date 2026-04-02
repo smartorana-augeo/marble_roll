@@ -1,3 +1,6 @@
+import { DisplaySettings } from '../config/DisplaySettings.js';
+import { GameplaySettings } from '../config/GameplaySettings.js';
+
 /**
  * DOM overlays: menu, level complete, HUD. Does not own game logic.
  */
@@ -6,8 +9,10 @@ export class UISystem {
     this.appRoot = document.getElementById('app');
     this.menu = document.getElementById('screen-menu');
     this.levelComplete = document.getElementById('screen-level-complete');
+    this.runGameOver = document.getElementById('screen-run-game-over');
     this.hud = document.getElementById('hud');
     this.hudLevelName = document.getElementById('hud-level-name');
+    this.hudFallsRow = document.getElementById('hud-falls-row');
     this.hudCoinsLevel = document.getElementById('hud-coins-level');
     this.hudCoinsRun = document.getElementById('hud-coins-run');
     this.levelCompleteTitle = document.getElementById('level-complete-title');
@@ -20,13 +25,45 @@ export class UISystem {
     this.btnContinue = document.getElementById('btn-continue');
     this.marbleDead = document.getElementById('screen-marble-dead');
     this.btnTryAgain = document.getElementById('btn-try-again');
+    this.btnRunRestart = document.getElementById('btn-run-restart');
+    this.btnRunMenu = document.getElementById('btn-run-menu');
+    this.runOverDevActions = document.getElementById('run-over-dev-actions');
+    this.btnDevRunRestartCurrentLevel = document.getElementById('btn-dev-run-restart-current-level');
     this.loadingOverlay = document.getElementById('loading-overlay');
     this.loadingTitle = document.getElementById('loading-overlay-title');
     this.loadingPhase = document.getElementById('loading-phase');
     this.loadingProgress = document.getElementById('loading-progress');
     this.menuSubtitle = document.getElementById('menu-subtitle');
+    this.hudControlsLegend = document.getElementById('hud-controls-legend');
     /** @type {string | null} */
     this._menuSubtitleDefault = null;
+    this._fillHudControlLegend();
+  }
+
+  _fillHudControlLegend() {
+    const el = this.hudControlsLegend;
+    if (!el || !DisplaySettings.controlBindings.length) return;
+    el.replaceChildren();
+    for (const { icon, action, keys } of DisplaySettings.controlBindings) {
+      const line = document.createElement('span');
+      line.className = 'hud-legend__line';
+      const iconEl = document.createElement('span');
+      iconEl.className = 'hud-legend__icon';
+      iconEl.textContent = icon;
+      const textEl = document.createElement('span');
+      textEl.className = 'hud-legend__text';
+      const labelStrong = document.createElement('strong');
+      labelStrong.className = 'hud-legend__action';
+      labelStrong.textContent = action;
+      const keysEl = document.createElement('span');
+      keysEl.className = 'hud-legend__keys';
+      keysEl.textContent = keys;
+      textEl.appendChild(labelStrong);
+      textEl.appendChild(keysEl);
+      line.appendChild(iconEl);
+      line.appendChild(textEl);
+      el.appendChild(line);
+    }
   }
 
   /**
@@ -66,6 +103,10 @@ export class UISystem {
     if (this.loadingOverlay) this.loadingOverlay.hidden = false;
     if (this.btnNewGame) this.btnNewGame.disabled = true;
     if (this.btnContinue) this.btnContinue.disabled = true;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = true;
+      this.runGameOver.classList.remove('screen--visible');
+    }
   }
 
   hideLevelLoadingScreen() {
@@ -111,8 +152,32 @@ export class UISystem {
     }
     if (this.levelComplete) this.levelComplete.hidden = true;
     if (this.marbleDead) this.marbleDead.hidden = true;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = true;
+      this.runGameOver.classList.remove('screen--visible');
+    }
     if (this.hud) this.hud.hidden = true;
     if (this.devBypassWrap) this.devBypassWrap.hidden = true;
+  }
+
+  /**
+   * @param {number} fallCount Falls so far this run (0…{@link GameplaySettings.runMaxFalls}).
+   */
+  setFallHud(fallCount) {
+    const max = GameplaySettings.runMaxFalls;
+    const row = this.hudFallsRow;
+    if (!row) return;
+    const chars = row.querySelectorAll('.hud-fall-char');
+    chars.forEach((el, i) => {
+      el.classList.remove('hud-fall-char--pending', 'hud-fall-char--spent', 'hud-fall-char--terminal');
+      if (fallCount >= max) {
+        el.classList.add('hud-fall-char--terminal');
+      } else if (i < fallCount) {
+        el.classList.add('hud-fall-char--spent');
+      } else {
+        el.classList.add('hud-fall-char--pending');
+      }
+    });
   }
 
   /**
@@ -144,6 +209,10 @@ export class UISystem {
     }
     if (this.levelComplete) this.levelComplete.hidden = true;
     if (this.marbleDead) this.marbleDead.hidden = true;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = true;
+      this.runGameOver.classList.remove('screen--visible');
+    }
     if (this.hud) this.hud.hidden = false;
     if (this.hudLevelName) this.hudLevelName.textContent = levelDisplayName;
     if (this.devBypassWrap) this.devBypassWrap.hidden = !devMode;
@@ -161,6 +230,10 @@ export class UISystem {
       this.menu.classList.remove('screen--visible');
     }
     if (this.marbleDead) this.marbleDead.hidden = true;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = true;
+      this.runGameOver.classList.remove('screen--visible');
+    }
     if (this.levelComplete) this.levelComplete.hidden = false;
     if (this.hud) this.hud.hidden = true;
     if (this.devBypassWrap) this.devBypassWrap.hidden = true;
@@ -181,6 +254,13 @@ export class UISystem {
     }
   }
 
+  /**
+   * Reads the menu “dev mode” checkbox so it stays correct after toggling mid-run.
+   */
+  _devModeFromCheckbox() {
+    return !!this.devModeCheckbox?.checked;
+  }
+
   showMarbleDead() {
     if (this.menu) {
       this.menu.hidden = true;
@@ -188,7 +268,33 @@ export class UISystem {
     }
     if (this.levelComplete) this.levelComplete.hidden = true;
     if (this.marbleDead) this.marbleDead.hidden = false;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = true;
+      this.runGameOver.classList.remove('screen--visible');
+    }
     if (this.hud) this.hud.hidden = true;
+    if (this.devBypassWrap) this.devBypassWrap.hidden = true;
+  }
+
+  showRunGameOver() {
+    this.appRoot?.classList.remove('app--playing');
+    if (this.menu) {
+      this.menu.hidden = true;
+      this.menu.classList.remove('screen--visible');
+    }
+    if (this.levelComplete) this.levelComplete.hidden = true;
+    if (this.marbleDead) this.marbleDead.hidden = true;
+    if (this.runGameOver) {
+      this.runGameOver.hidden = false;
+      this.runGameOver.classList.add('screen--visible');
+    }
+    const showRestartCurrentLevel =
+      this._devModeFromCheckbox() &&
+      GameplaySettings.dev.runGameOverRestartCurrentLevelClearsFalls;
+    if (this.runOverDevActions) {
+      this.runOverDevActions.hidden = !showRestartCurrentLevel;
+    }
+    /** Keep HUD visible so terminal (pink) fall markers stay readable above the scrim. */
     if (this.devBypassWrap) this.devBypassWrap.hidden = true;
   }
 }

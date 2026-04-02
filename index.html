@@ -6,11 +6,12 @@
   <!-- Avoid stale menu when refreshing during development; use a hard refresh if the start screen looks old. -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
-  <title>Marble roll</title>
+  <title>nova roll</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260401k" />
+  <link rel="stylesheet" href="styles.css?v=20260403t" />
+  <link rel="stylesheet" href="crtOverlay.css?v=20260403t" />
   <script type="importmap">
   {
     "imports": {
@@ -30,24 +31,63 @@
     <canvas id="game-canvas" tabindex="0"></canvas>
     <div id="ui-root" aria-live="polite">
       <div id="screen-menu" class="screen screen--visible">
-        <h1 id="menu-heading">Marble roll</h1>
-        <p class="menu-subtitle" id="menu-subtitle">3D physics marble</p>
-        <p class="hint" id="menu-hint">Roll to the orange goal.</p>
-        <p class="keys" id="menu-keys">
-          <strong>Move</strong> WASD or arrows · <strong>Jump</strong> Space · <strong>Brake</strong> Shift · <strong>Camera</strong> arrow keys (orbit) · <strong>Restart</strong> R
+        <div class="menu-panel hud-panel">
+          <h1 id="menu-heading" class="menu-heading menu-heading--glitch">nova roll</h1>
+          <p class="menu-subtitle" id="menu-subtitle">CONTROLS</p>
+          <p class="keys" id="menu-keys">
+            <span class="keys__line"><strong class="keys__action">Move</strong><span class="keys__binding">WASD</span></span>
+            <span class="keys__line"><strong class="keys__action">Jump</strong><span class="keys__binding">Space</span></span>
+            <span class="keys__line"><strong class="keys__action">Brake</strong><span class="keys__binding">Shift</span></span>
+            <span class="keys__line"><strong class="keys__action">Camera</strong><span class="keys__binding">arrows</span></span>
+            <span class="keys__line"><strong class="keys__action">Restart</strong><span class="keys__binding">R</span></span>
+            <span class="keys__line"><strong class="keys__action">Mute</strong><span class="keys__binding">M</span></span>
+          </p>
+          <div class="menu-actions">
+            <button type="button" id="btn-new-game" class="btn-primary btn-primary--cyber btn-primary--glitch">
+              <span class="btn-primary__label">new game</span>
+            </button>
+          </div>
+        </div>
+        <p
+          class="menu-build"
+          id="menu-build"
+          title="If this line is missing, the browser or server is not loading this folder’s index.html"
+        >
+          build 20260403t
         </p>
-        <div class="menu-actions">
-          <label class="dev-mode-label">
-            <input type="checkbox" id="dev-mode" />
-            Dev mode (skip level)
-          </label>
-          <button type="button" id="btn-new-game" class="btn-primary">
-            <span class="btn-primary__label">New game</span>
+        <label class="dev-mode-label">
+          <input type="checkbox" id="dev-mode" />
+          dev mode (skip level)
+        </label>
+        <span class="btn-mute-wrap btn-mute-wrap--menu-corner">
+          <button
+            type="button"
+            id="btn-menu-music-mute"
+            class="btn-mute btn-mute--menu-corner"
+            aria-pressed="false"
+            aria-label="Mute music"
+            aria-describedby="tooltip-menu-mute"
+          >
+            <span class="btn-mute__label" aria-hidden="true">|&gt;</span>
+          </button>
+          <span id="tooltip-menu-mute" class="btn-mute__tooltip" role="tooltip">Mute</span>
+        </span>
+      </div>
+      <div
+        id="screen-credits"
+        class="screen credits-screen"
+        hidden
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Credits"
+      >
+        <div class="credits-panel hud-panel menu-panel">
+          <div id="credits-body" class="credits-panel__body"></div>
+          <button type="button" id="btn-credits-close" class="btn-primary btn-primary--cyber credits-panel__close">
+            <span class="btn-primary__label">close</span>
           </button>
         </div>
-        <p class="menu-build" title="If this line is missing, the browser or server is not loading this folder’s index.html">
-          WebGL + cannon-es · procgen grid + jump splits · embed-ready · build 20260401d
-        </p>
       </div>
       <div id="loading-overlay" class="loading-overlay" hidden aria-busy="true" aria-live="polite">
         <div class="loading-overlay__scrim" aria-hidden="true"></div>
@@ -67,27 +107,73 @@
       <div id="screen-marble-dead" class="screen" hidden>
         <h2 id="death-heading">Out of bounds</h2>
         <p class="hint" id="death-hint">You fell too far. Press the button or R to try again.</p>
-        <button type="button" id="btn-try-again" class="btn-primary">
-          <span class="btn-primary__label">Try again</span>
-        </button>
+        <div class="marble-dead-actions">
+          <button type="button" id="btn-try-again" class="btn-primary btn-primary--cyber btn-primary--glitch">
+            <span class="btn-primary__label">try again</span>
+          </button>
+        </div>
+      </div>
+      <div id="screen-run-game-over" class="screen screen--run-over" hidden>
+        <h2 id="run-over-heading">Run over</h2>
+        <p class="hint" id="run-over-hint">Three falls — this run has ended.</p>
+        <div class="run-over-actions">
+          <button type="button" id="btn-run-restart" class="btn-primary btn-primary--cyber btn-primary--glitch">
+            <span class="btn-primary__label">restart from level 1</span>
+          </button>
+          <button type="button" id="btn-run-menu" class="btn-primary btn-primary--cyber">
+            <span class="btn-primary__label">main menu</span>
+          </button>
+        </div>
+        <div id="run-over-dev-actions" class="run-over-dev-actions" hidden>
+          <button type="button" id="btn-dev-run-restart-current-level" class="btn-primary btn-primary--cyber">
+            <span class="btn-primary__label">restart this level</span>
+          </button>
+        </div>
       </div>
       <div id="screen-level-complete" class="screen" hidden>
         <h2 id="level-complete-title">Level complete</h2>
         <p id="level-complete-scores" class="level-complete-scores" hidden></p>
         <p id="level-complete-msg" class="hint">Press Enter to continue.</p>
-        <button type="button" id="btn-continue" class="btn-primary">
-          <span class="btn-primary__label">Next level</span>
+        <button type="button" id="btn-continue" class="btn-primary btn-primary--cyber">
+          <span class="btn-primary__label">next level</span>
         </button>
       </div>
       <div id="hud" class="hud" hidden>
-        <div class="hud-row hud-row--title"><span id="hud-level-name"></span></div>
-        <div class="hud-row hud-row--coins"><span id="hud-coins-level"></span><span class="hud-sep" aria-hidden="true">·</span><span id="hud-coins-run"></span></div>
-      </div>
-      <div id="dev-bypass-wrap" class="dev-bypass-wrap" hidden>
-        <button type="button" id="btn-dev-skip-level" class="btn-dev">Skip level</button>
+        <aside class="hud-panel hud-legend" id="hud-controls-legend" aria-label="Controls"></aside>
+        <div class="hud-panel hud-centre">
+          <div class="hud-row hud-row--title"><span id="hud-level-name"></span></div>
+          <div class="hud-row hud-row--falls" id="hud-falls-row" aria-label="Falls this run">
+            <span class="hud-fall-char" data-fall-index="0">X</span>
+            <span class="hud-fall-char" data-fall-index="1">X</span>
+            <span class="hud-fall-char" data-fall-index="2">X</span>
+          </div>
+          <div class="hud-row hud-row--coins"><span id="hud-coins-level"></span><span class="hud-sep" aria-hidden="true">·</span><span id="hud-coins-run"></span></div>
+        </div>
+        <div class="hud-hfill">
+          <div class="hud-stack-right">
+            <div class="music-mute music-mute--hud hud-panel" id="hud-music-mute-wrap">
+              <span class="btn-mute-wrap btn-mute-wrap--hud">
+                <button
+                  type="button"
+                  id="btn-hud-music-mute"
+                  class="btn-mute"
+                  aria-pressed="false"
+                  aria-label="Mute music"
+                  aria-describedby="tooltip-hud-mute"
+                >
+                  <span class="btn-mute__label" aria-hidden="true">|&gt;</span>
+                </button>
+                <span id="tooltip-hud-mute" class="btn-mute__tooltip" role="tooltip">Mute</span>
+              </span>
+            </div>
+            <div id="dev-bypass-wrap" class="dev-bypass-wrap" hidden>
+              <button type="button" id="btn-dev-skip-level" class="btn-dev">Skip level</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-  <script type="module" src="main.js?v=20260401k"></script>
+  <script type="module" src="main.js?v=20260403m"></script>
 </body>
 </html>

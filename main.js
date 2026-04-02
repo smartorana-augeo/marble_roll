@@ -1,5 +1,8 @@
+import { applyVisualSettingsToDom } from './game/config/VisualSettings.js';
 import { GameApplication } from './game/GameApplication.js';
 import { isWebGLAvailable } from './game/embed/EmbedHost.js';
+
+applyVisualSettingsToDom();
 
 if (!isWebGLAvailable()) {
   document.body.innerHTML =

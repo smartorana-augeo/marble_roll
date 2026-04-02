@@ -25,6 +25,29 @@
   /** Progress track / fill (bar strip region, rows 3–4) */
   --bar-track-y: -96px;
   --bar-fill-y: -112px;
+  /** In-game HUD only (`#hud`); menu keeps classic pack colours */
+  --hud-neon-cyan: #5de8ff;
+  --hud-neon-magenta: #ff3da8;
+  --hud-neon-amber: #ffc14f;
+  --hud-panel-face: rgba(4, 10, 26, 0.9);
+  /** Set from `VisualSettings` via `applyVisualSettingsToDom` (fallbacks for first paint) */
+  --vs-hud-panel-glow:
+    0 0 12px rgba(93, 232, 255, 0.28),
+    0 0 28px rgba(255, 61, 168, 0.14),
+    inset 0 0 20px rgba(93, 232, 255, 0.06);
+  --vs-hud-panel-glow-menu:
+    0 0 10px rgba(93, 162, 240, 0.22),
+    0 0 22px rgba(242, 142, 43, 0.1),
+    inset 0 0 16px rgba(93, 162, 240, 0.05);
+  --vs-btn-glitch-duration: 4.6s;
+  /** CRT starfield wobble — overridden by `applyVisualSettingsToDom` */
+  --vs-crt-bg-wobble: 1;
+  --crt-bg-drift-duration: 26s;
+  --crt-bg-wobble-duration: 12s;
+  --crt-bg-grain-drift-duration: 26s;
+  --crt-bg-grain-opacity: 0.038;
+  /** Star tile width vs positioning area; height is `auto` so the bitmap is not axis-stretched. */
+  --bg-stars-tile-w: 300%;
 }
 
 html,
@@ -34,7 +57,7 @@ body {
   overflow: hidden;
   font-family: var(--font-ui);
   font-size: 22px;
-  background: #091833;
+  background: #0e1c2e;
   color: #e8f0ff;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: auto;
@@ -47,19 +70,94 @@ body {
   isolation: isolate;
 }
 
-/** Starfield: top-left third × top half of background sheet → blue-tint panel. */
+/**
+ * Starfield: one uniform zoom (`--bg-stars-tile-w` + `auto` height) so stars keep pixel aspect;
+ * `repeat` fills the viewport — ultrawide gets more tiles, not a wider squash of one image.
+ */
 #app::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-color: #091833;
-  background-image: var(--bg-stars);
-  background-repeat: no-repeat;
-  background-size: 300% 200%;
-  background-position: 0 0;
+  background-color: #0e1c2e;
+  background-image:
+    var(--bg-stars),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 5px,
+      rgba(200, 220, 255, var(--crt-bg-grain-opacity)) 5px,
+      rgba(200, 220, 255, var(--crt-bg-grain-opacity)) 6px
+    );
+  background-repeat: repeat, repeat;
+  background-size:
+    var(--bg-stars-tile-w) auto,
+    96px 8px;
+  background-position: 0 0, 0 0;
+  background-blend-mode: normal, soft-light;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  transform: translate3d(0, 0, 0);
+  contain: paint;
+  /** Hint compositor: transform wobble + merged opacity pulse in drift keyframes. */
+  will-change: transform, opacity;
+}
+
+/**
+ * Two animations only: (1) drift + grain + tiny opacity pulse merged — no animated filter;
+ * (2) transform wobble. Avoids full-viewport filter repaints from the old “breathe” pass.
+ */
+html:not(.vs-crt-bg-wobble-off) #app::before {
+  animation:
+    crt-bg-drift-grain var(--crt-bg-drift-duration) ease-in-out infinite alternate,
+    crt-bg-wobble var(--crt-bg-wobble-duration) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(.vs-crt-bg-wobble-off) #app::before {
+    animation: none !important;
+    opacity: 1 !important;
+    will-change: auto;
+  }
+}
+
+@keyframes crt-bg-drift-grain {
+  0% {
+    background-position:
+      0 0,
+      0 0;
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.985;
+  }
+
+  100% {
+    background-position:
+      1.1% 0.75%,
+      64px 12px;
+    opacity: 1;
+  }
+}
+
+@keyframes crt-bg-wobble {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  22% {
+    transform: translate3d(0.4px, -0.28px, 0) rotate(0.018deg);
+  }
+
+  48% {
+    transform: translate3d(-0.22px, 0.18px, 0) rotate(-0.012deg);
+  }
+
+  71% {
+    transform: translate3d(0.16px, 0.32px, 0) rotate(0.009deg);
+  }
 }
 
 #game-canvas {
@@ -87,10 +185,11 @@ body {
 }
 
 #ui-root .screen,
-#ui-root .hud,
 #ui-root .dev-bypass-wrap,
 #ui-root .loading-overlay,
 #ui-root .menu-actions,
+#ui-root .music-mute,
+#ui-root .btn-mute-wrap,
 #ui-root button {
   pointer-events: auto;
 }
@@ -137,6 +236,177 @@ body {
   text-shadow: 2px 2px 0 var(--pack-dark);
 }
 
+/** Framed like `.hud-panel` (legend / score); shares those rules via dual class. */
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: min(28rem, 100%);
+  box-sizing: border-box;
+}
+
+.menu-panel .menu-actions {
+  margin-top: 0.25rem;
+}
+
+/** Start screen: corner mute (positioned on `#screen-menu`, not inside the card). */
+.btn-mute-wrap--menu-corner {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+#screen-menu .btn-mute-wrap--menu-corner {
+  position: absolute;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  right: max(1rem, env(safe-area-inset-right, 0px));
+  z-index: 2;
+}
+
+.btn-mute--menu-corner {
+  padding: 0.2rem 0.28rem;
+  min-width: 2.1ch;
+  font-family: ui-monospace, monospace;
+  font-size: 0.88rem;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.btn-mute-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-mute-wrap--hud {
+  width: 100%;
+}
+
+/**
+ * Cyberpunk tooltip: same language as HUD panels (magenta accent, cyan border glow).
+ */
+.btn-mute__tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.38rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 0.28rem 0.55rem 0.32rem;
+  font-family: var(--font-ui);
+  font-size: clamp(0.65rem, 0.35rem + 0.85vw, 0.82rem);
+  line-height: 1.15;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--hud-neon-magenta, #ff3da8);
+  text-shadow:
+    0 0 8px rgba(255, 61, 168, 0.42),
+    0 0 2px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.12s ease,
+    visibility 0.12s ease;
+  background: linear-gradient(
+    165deg,
+    rgba(18, 36, 62, 0.96) 0%,
+    rgba(6, 12, 28, 0.98) 45%,
+    rgba(12, 8, 32, 0.95) 100%
+  );
+  border: 1px solid rgba(255, 61, 168, 0.55);
+  border-left: 3px solid var(--hud-neon-magenta, #ff3da8);
+  box-shadow:
+    0 0 14px rgba(255, 61, 168, 0.2),
+    0 0 3px rgba(255, 61, 168, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+
+.btn-mute-wrap:hover .btn-mute__tooltip,
+.btn-mute-wrap:focus-within .btn-mute__tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+#hud .btn-mute__tooltip {
+  font-size: 1em;
+}
+
+/** HUD: music mute — icon only (no panel frame; see `#hud .music-mute--hud.hud-panel`). */
+.music-mute {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.65rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.music-mute--hud {
+  margin-top: 0;
+}
+
+/** Flat control inside panel borders (matches HUD legend / box treatment). */
+.btn-mute {
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  margin: 0;
+  padding: 0.12rem 0.2rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  image-rendering: pixelated;
+  color: var(--hud-neon-magenta, #ff3da8);
+  text-shadow:
+    0 0 8px rgba(255, 61, 168, 0.35),
+    0 0 2px rgba(0, 0, 0, 0.75);
+}
+
+.btn-mute:hover {
+  filter: brightness(1.1);
+  color: #ffe8f4;
+}
+
+.btn-mute:focus-visible {
+  outline: 2px solid var(--hud-neon-magenta, #ff3da8);
+  outline-offset: 2px;
+}
+
+.btn-mute__label {
+  display: block;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  background: none;
+  color: inherit;
+  text-shadow: inherit;
+}
+
+/** Start screen: control rows centred as a block; action/key pairs stay centred in the panel. */
+#screen-menu .keys {
+  align-items: center;
+  align-self: center;
+  width: 100%;
+  max-width: min(22rem, 100%);
+}
+
+#screen-menu .keys__line {
+  justify-content: center;
+  gap: 1.25rem;
+  max-width: 20rem;
+}
+
 .menu-subtitle {
   margin: 0 0 0.5rem;
   font-size: 1.15rem;
@@ -154,6 +424,30 @@ body {
   line-height: 1.35;
 }
 
+/** Sits under `.menu-build`; same scale as build line. */
+.dev-mode-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0;
+  max-width: 26rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  opacity: 0.55;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dev-mode-label input {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--pack-blue);
+}
+
 .hint {
   margin: 0.25rem 0 1rem;
   max-width: 28rem;
@@ -162,69 +456,373 @@ body {
   font-size: 1.05rem;
 }
 
-.keys {
-  margin: 0 0 1.5rem;
-  font-size: 1rem;
-  opacity: 0.88;
+.marble-dead-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: min(24rem, 100%);
 }
 
-/** 3-part sprite: left cap | repeating mid | right cap (SpaceShooterAssetPack_IU.png). */
+.keys {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  opacity: 0.88;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 0.2rem;
+  line-height: 1.35;
+  max-width: 100%;
+}
+
+.keys__line {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.keys__action {
+  flex: 0 1 auto;
+  text-align: left;
+}
+
+.keys__binding {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+/** Credits overlay (Markdown body in `#credits-body`; source `credits.md`). */
+.credits-screen {
+  z-index: 15;
+  background: rgba(4, 12, 28, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.credits-panel.menu-panel {
+  align-items: stretch;
+  max-width: min(32rem, 94vw);
+  padding: 1.35rem 1.4rem 1.2rem;
+  border-radius: 2px;
+  border: 1px solid rgba(93, 232, 255, 0.5);
+  background: linear-gradient(
+    165deg,
+    rgba(18, 36, 62, 0.96) 0%,
+    rgba(6, 12, 28, 0.98) 45%,
+    rgba(12, 8, 32, 0.95) 100%
+  );
+  box-shadow:
+    0 0 18px rgba(93, 232, 255, 0.2),
+    0 0 8px rgba(255, 61, 168, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    4px 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+.credits-panel__body {
+  text-align: left;
+  width: 100%;
+  max-height: min(58vh, 24rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 0 1rem;
+  padding-right: 0.35rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: #e8f0ff;
+}
+
+/** Beat `.screen h2` (orange) for Markdown-rendered headings inside the credits card. */
+.credits-screen .credits-panel__h2 {
+  margin: 0 0 0.65rem;
+  font-size: clamp(1.45rem, 4vw, 1.85rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--pack-blue);
+  text-shadow:
+    2px 2px 0 var(--pack-dark),
+    -1px -1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.credits-screen .credits-panel__h3 {
+  margin: 0.95rem 0 0.4rem;
+  font-size: 1.18rem;
+  font-weight: 400;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--pack-orange);
+  text-shadow: 1px 1px 0 var(--pack-dark);
+}
+
+.credits-screen .credits-panel__h3:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.credits-screen .credits-panel__h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 400;
+  color: var(--pack-blue);
+  text-shadow: 1px 1px 0 var(--pack-dark);
+}
+
+.credits-panel__p {
+  margin: 0 0 0.6rem;
+}
+
+.credits-panel__p:last-child {
+  margin-bottom: 0;
+}
+
+.credits-panel__p--error {
+  color: #ff9eb0;
+}
+
+.credits-panel__ul {
+  margin: 0 0 0.6rem 1.15rem;
+  padding: 0;
+  list-style: square;
+}
+
+.credits-panel__li {
+  margin: 0.25rem 0;
+}
+
+.credits-panel__a {
+  color: var(--hud-neon-cyan);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.credits-panel__a:hover {
+  color: #e8fbff;
+}
+
+.credits-panel__strong {
+  font-weight: 400;
+  color: #f4f8ff;
+  text-shadow: 0 0 10px rgba(93, 232, 255, 0.28);
+}
+
+.credits-panel__close {
+  align-self: center;
+}
+
+/**
+ * Primary actions: cyberpunk panel (replaces sprite strip). Tune glow via `VisualSettings` CSS vars.
+ */
 .btn-primary {
   display: inline-flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  margin: 0;
   border: none;
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 1.35rem;
-  image-rendering: crisp-edges;
+  font-size: 1.28rem;
+  line-height: 1.2;
+  image-rendering: pixelated;
   background: transparent;
-  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4));
 }
 
-.btn-primary::before,
-.btn-primary::after {
-  content: '';
-  width: 44px;
-  min-height: 32px;
-  flex-shrink: 0;
-  align-self: center;
-  background-image: var(--ui-tiles);
-  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
-  background-repeat: no-repeat;
+.btn-primary.btn-primary--cyber {
+  padding: 0.48rem 1.35rem;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 61, 168, 0.55);
+  background: linear-gradient(
+    165deg,
+    rgba(18, 36, 62, 0.97) 0%,
+    rgba(6, 12, 28, 0.98) 45%,
+    rgba(12, 8, 32, 0.96) 100%
+  );
+  box-shadow:
+    0 0 14px rgba(255, 61, 168, 0.22),
+    0 0 4px rgba(255, 61, 168, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    4px 4px 0 rgba(0, 0, 0, 0.5);
+  color: var(--hud-neon-magenta, #ff3da8);
+  text-shadow:
+    0 0 10px rgba(255, 61, 168, 0.45),
+    0 0 2px rgba(0, 0, 0, 0.8);
+  text-transform: lowercase;
+  letter-spacing: 0.06em;
+  transform: translate3d(0, 0, 0);
 }
 
-.btn-primary::before {
-  background-position: var(--btn-cap-left);
+.btn-primary.btn-primary--cyber:hover {
+  filter: brightness(1.08);
+  border-color: rgba(255, 200, 230, 0.72);
+  color: #ffe8f4;
 }
 
-.btn-primary::after {
-  background-position: var(--btn-cap-right);
+.btn-primary.btn-primary--cyber:focus-visible {
+  outline: 2px solid var(--hud-neon-magenta, #ff3da8);
+  outline-offset: 3px;
+}
+
+/** Menu “new game”, out-of-bounds “try again”, run-over “main menu”: classic cyan label. */
+#btn-new-game.btn-primary--cyber,
+#btn-try-again.btn-primary--cyber,
+#btn-run-menu.btn-primary--cyber {
+  border: 1px solid rgba(93, 232, 255, 0.55);
+  box-shadow:
+    0 0 14px rgba(93, 232, 255, 0.22),
+    0 0 4px rgba(93, 232, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    4px 4px 0 rgba(0, 0, 0, 0.5);
+  color: var(--hud-neon-cyan, #5de8ff);
+  text-shadow:
+    0 0 10px rgba(93, 232, 255, 0.45),
+    0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+#btn-new-game.btn-primary--cyber:hover,
+#btn-try-again.btn-primary--cyber:hover,
+#btn-run-menu.btn-primary--cyber:hover {
+  border-color: rgba(255, 61, 168, 0.65);
+  color: #e8fbff;
 }
 
 .btn-primary__label {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  min-width: 48px;
-  padding: 4px 8px;
-  background-image: var(--ui-tiles);
-  background-size: var(--ui-sheet-w) var(--ui-sheet-h);
-  background-position: var(--btn-mid-x);
-  background-repeat: repeat-x;
-  color: var(--pack-dark);
-  text-shadow: none;
+  display: block;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  background: none;
+  color: inherit;
+  text-shadow: inherit;
 }
 
-.btn-primary:hover {
-  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4)) brightness(1.07);
+/** Glitch bursts on selected primary buttons (enable via `html.vs-btn-glitch`). */
+@keyframes btn-cyber-glitch {
+  0%,
+  91%,
+  91.4%,
+  100% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: hue-rotate(0deg);
+  }
+
+  91.15% {
+    transform: translate3d(-3px, 1px, 0) skewX(-1deg);
+    filter: hue-rotate(12deg);
+  }
+
+  91.25% {
+    transform: translate3d(2px, -1px, 0) skewX(0.7deg);
+    filter: hue-rotate(-10deg);
+  }
+
+  91.32% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: hue-rotate(0deg);
+  }
 }
 
-.btn-primary:focus-visible {
-  outline: 2px solid var(--pack-blue);
-  outline-offset: 3px;
+html.vs-btn-glitch .btn-primary--glitch.btn-primary--cyber {
+  animation: btn-cyber-glitch var(--vs-btn-glitch-duration, 4.6s) steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.vs-btn-glitch .btn-primary--glitch.btn-primary--cyber {
+    animation: none;
+  }
+}
+
+/**
+ * Start title: bold + layered glow (“blur”), extra glitch bursts vs {@link btn-cyber-glitch}.
+ * Gated by `html.vs-btn-glitch` (see {@link applyVisualSettingsToDom}).
+ */
+@keyframes menu-title-cyber-glitch {
+  0%,
+  22.85%,
+  23.25%,
+  55.45%,
+  55.88%,
+  87.92%,
+  88.35%,
+  90.92%,
+  91.38%,
+  100% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: hue-rotate(0deg);
+  }
+
+  23.05% {
+    transform: translate3d(2px, -1px, 0) skewX(0.85deg);
+    filter: hue-rotate(-9deg);
+  }
+
+  23.12% {
+    transform: translate3d(-1px, 1px, 0) skewX(-0.4deg);
+    filter: hue-rotate(6deg);
+  }
+
+  55.65% {
+    transform: translate3d(-2px, 1px, 0) skewX(-0.75deg);
+    filter: hue-rotate(10deg);
+  }
+
+  55.72% {
+    transform: translate3d(1px, 0, 0) skewX(0.5deg);
+    filter: hue-rotate(-5deg);
+  }
+
+  88.08% {
+    transform: translate3d(1px, -1px, 0) skewX(0.55deg);
+    filter: hue-rotate(7deg);
+  }
+
+  91.15% {
+    transform: translate3d(-3px, 1px, 0) skewX(-1deg);
+    filter: hue-rotate(12deg);
+  }
+
+  91.25% {
+    transform: translate3d(2px, -1px, 0) skewX(0.7deg);
+    filter: hue-rotate(-10deg);
+  }
+
+  91.32% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: hue-rotate(0deg);
+  }
+}
+
+#menu-heading.menu-heading--glitch {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+  color: var(--hud-neon-cyan, #5de8ff);
+  text-shadow:
+    0 0 18px rgba(93, 232, 255, 0.55),
+    0 0 36px rgba(93, 232, 255, 0.28),
+    0 0 3px rgba(93, 232, 255, 0.95),
+    2px 2px 0 var(--pack-dark),
+    -2px 0 0 rgba(255, 61, 168, 0.42),
+    2px 0 0 rgba(0, 217, 255, 0.32),
+    -1px -1px 0 rgba(255, 255, 255, 0.06);
+  transform: translate3d(0, 0, 0);
+}
+
+html.vs-btn-glitch #menu-heading.menu-heading--glitch {
+  animation: menu-title-cyber-glitch var(--vs-btn-glitch-duration, 4.6s) steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.vs-btn-glitch #menu-heading.menu-heading--glitch {
+    animation: none;
+  }
 }
 
 .menu-actions {
@@ -234,27 +832,17 @@ body {
   gap: 1rem;
 }
 
-.dev-mode-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.05rem;
-  cursor: pointer;
-  user-select: none;
-  opacity: 0.92;
-}
-
-.dev-mode-label input {
-  width: 1.1rem;
-  height: 1.1rem;
-  cursor: pointer;
-}
-
+/**
+ * Sits under the HUD mute control (see `.hud-stack-right`); no longer absolutely positioned.
+ */
 .dev-bypass-wrap {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+  position: relative;
   z-index: 2;
+}
+
+#hud .btn-dev {
+  font-size: 1em;
+  padding: clamp(0.22rem, 0.08rem + 0.55vw, 0.35rem) clamp(0.45rem, 0.15rem + 0.85vw, 0.75rem);
 }
 
 .dev-bypass-wrap[hidden] {
@@ -263,19 +851,22 @@ body {
 
 .btn-dev {
   cursor: pointer;
-  border: 2px solid var(--pack-blue);
+  border: 2px solid var(--hud-neon-magenta, #ff3da8);
   padding: 0.35rem 0.75rem;
   font-family: var(--font-ui);
   font-size: 1rem;
-  color: var(--pack-blue);
+  color: var(--hud-neon-magenta, #ff3da8);
   background: rgba(13, 22, 40, 0.85);
   image-rendering: pixelated;
   box-shadow: 2px 2px 0 var(--pack-dark);
+  text-shadow:
+    0 0 8px rgba(255, 61, 168, 0.35),
+    0 0 1px rgba(0, 0, 0, 0.75);
 }
 
 .btn-dev:hover {
-  background: rgba(93, 162, 240, 0.2);
-  color: #e8f4ff;
+  background: rgba(255, 61, 168, 0.18);
+  color: #ffe8f4;
 }
 
 .btn-dev:focus-visible {
@@ -286,19 +877,228 @@ body {
 .hud {
   position: absolute;
   top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 1rem;
+  right: 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+  font-size: 1.05rem;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/**
+ * Fluid type + spacing so legend, centre titles, and mute stay within the grid on small viewports.
+ * Child sizes use `em` where overridden so they track this root.
+ */
+#hud.hud {
+  --hud-pad-inline: clamp(0.35rem, 0.15rem + 1.1vw, 0.65rem);
+  --hud-pad-block: clamp(0.28rem, 0.1rem + 0.85vw, 0.5rem);
+  font-size: clamp(0.62rem, 0.22rem + 1.35vw, 1.06rem);
+  gap: clamp(0.35rem, 0.15rem + 1.5vw, 0.75rem);
+  --hud-centre-scale: 1.14;
+}
+
+.hud-panel {
   padding: 0.35rem 0.9rem;
   border-radius: 2px;
-  font-size: 1.05rem;
   background: rgba(13, 22, 40, 0.82);
   border: 2px solid var(--pack-blue);
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.35),
+    var(--vs-hud-panel-glow-menu);
+}
+
+.menu-panel.hud-panel {
+  padding: 0.85rem 1.1rem 1rem;
+  box-shadow:
+    3px 3px 0 rgba(0, 0, 0, 0.35),
+    var(--vs-hud-panel-glow-menu);
+}
+
+.hud-legend {
+  grid-column: 1;
+  justify-self: start;
+  text-align: left;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  max-width: min(16rem, 100%);
+  color: var(--pack-orange);
+}
+
+.hud-legend__line {
+  display: block;
+}
+
+.hud-legend__line + .hud-legend__line {
+  margin-top: 0.08rem;
+}
+
+.hud-centre {
+  grid-column: 2;
+  justify-self: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
-  image-rendering: pixelated;
+}
+
+.hud-hfill {
+  grid-column: 3;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+
+.hud-stack-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+
+#hud .music-mute--hud {
+  width: auto;
+  max-width: min(18rem, 94vw);
+  justify-content: flex-end;
+}
+
+#hud .music-mute--hud.hud-panel {
+  padding: 0;
+  border: none;
+  border-left: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+#hud .music-mute--hud.hud-panel::before {
+  display: none;
+}
+
+#hud .music-mute--hud .btn-mute {
+  font-size: 1em;
+  line-height: 1.15;
+  padding: clamp(0.06em, 0.02em + 0.25vw, 0.14em) clamp(0.1em, 0.04em + 0.35vw, 0.2em);
+}
+
+/** Cyberpunk treatment: scoped to `#hud` so `.menu-panel.hud-panel` stays unchanged */
+#hud .hud-panel {
+  position: relative;
+  border-radius: 0;
+  padding: var(--hud-pad-block, 0.45rem) var(--hud-pad-inline, 1rem) calc(var(--hud-pad-block, 0.45rem) + 0.05rem);
+  background:
+    linear-gradient(145deg, rgba(0, 255, 255, 0.07) 0%, transparent 42%),
+    linear-gradient(315deg, rgba(255, 61, 168, 0.05) 0%, transparent 38%),
+    var(--hud-panel-face);
+  border: 1px solid rgba(93, 232, 255, 0.55);
+  border-left: 3px solid var(--hud-neon-magenta);
+  box-shadow:
+    0 0 18px rgba(93, 232, 255, 0.18),
+    0 0 2px rgba(93, 232, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    4px 4px 0 rgba(0, 0, 0, 0.45),
+    var(--vs-hud-panel-glow);
+}
+
+#hud .hud-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--hud-neon-magenta),
+    var(--hud-neon-cyan) 45%,
+    transparent 100%
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+#hud .hud-legend {
+  align-self: stretch;
+  width: 100%;
+  max-width: min(15.5rem, min(100%, 38vw));
+  font-size: 0.92em;
+  line-height: 1.32;
+  color: rgba(190, 245, 255, 0.92);
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 0 8px rgba(93, 232, 255, 0.35),
+    0 0 1px rgba(93, 232, 255, 0.8);
+}
+
+#hud .hud-legend__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: clamp(0.18rem, 0.08rem + 0.55vw, 0.38rem);
+  width: 100%;
+}
+
+#hud .hud-legend__icon {
+  flex: 0 0 clamp(2.65ch, 2.1ch + 1.1vw, 3.5ch);
+  width: clamp(2.65ch, 2.1ch + 1.1vw, 3.5ch);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--hud-neon-magenta);
+  text-shadow:
+    0 0 8px rgba(255, 61, 168, 0.45),
+    0 0 1px rgba(255, 200, 240, 0.7);
+}
+
+#hud .hud-legend__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: clamp(0.22rem, 0.08rem + 0.7vw, 0.45rem);
+}
+
+/** Matches start-screen pattern: bold action + normal keys; keys use a softer glow. */
+#hud .hud-legend__action {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(190, 245, 255, 0.98);
+  text-shadow:
+    0 0 10px rgba(93, 232, 255, 0.42),
+    0 0 2px rgba(93, 232, 255, 0.95);
+}
+
+#hud .hud-legend__keys {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  opacity: 0.88;
+  color: rgba(200, 238, 255, 0.92);
+  text-shadow:
+    0 0 14px rgba(93, 232, 255, 0.5),
+    0 0 8px rgba(93, 232, 255, 0.35),
+    0 0 2px rgba(140, 210, 255, 0.45);
+}
+
+#hud .hud-centre {
+  text-shadow: 0 0 10px rgba(93, 232, 255, 0.15);
+  font-size: calc(1em * var(--hud-centre-scale, 1.14));
+  padding-inline: calc(var(--hud-pad-inline, 0.55rem) * 1.15);
+  padding-block: calc(var(--hud-pad-block, 0.35rem) * 1.12);
 }
 
 .hud-row {
@@ -315,9 +1115,139 @@ body {
   color: var(--pack-orange);
 }
 
+#hud .hud-row--title {
+  color: var(--hud-neon-cyan);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 1.14em;
+  text-shadow:
+    0 0 12px rgba(93, 232, 255, 0.45),
+    0 0 2px rgba(93, 232, 255, 0.9);
+}
+
+#hud .hud-row--coins {
+  font-size: 1.05em;
+  color: var(--hud-neon-amber);
+  opacity: 1;
+  text-shadow:
+    0 0 10px rgba(255, 193, 79, 0.35),
+    0 0 1px rgba(255, 140, 90, 0.6);
+}
+
+/** Narrower than the coins/run row (~⅔ width); spaced ASCII fall markers. */
+#hud .hud-row--falls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1em, 0.55em + 2.4vw, 1.45em);
+  width: 66%;
+  max-width: 100%;
+  margin: 0.12em auto 0.38em;
+  box-sizing: border-box;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+#hud .hud-fall-char {
+  display: inline-block;
+  min-width: 1ch;
+  text-align: center;
+  font-size: 1.05em;
+}
+
+#hud .hud-fall-char--pending {
+  font-weight: 400;
+  color: rgba(28, 48, 64, 0.88);
+  text-shadow: none;
+}
+
+#hud .hud-fall-char--spent {
+  font-weight: 700;
+  color: var(--hud-neon-magenta, #ff3da8);
+  text-shadow:
+    0 0 14px rgba(255, 61, 168, 0.88),
+    0 0 26px rgba(255, 61, 168, 0.42),
+    2px 0 0 rgba(255, 120, 200, 0.45),
+    -2px 0 0 rgba(160, 0, 90, 0.4);
+  animation: hud-fall-glitch 3.2s steps(1, end) infinite;
+}
+
+#hud .hud-fall-char--terminal {
+  font-weight: 700;
+  color: var(--hud-neon-magenta, #ff3da8);
+  text-shadow:
+    0 0 18px rgba(255, 61, 168, 0.98),
+    0 0 34px rgba(255, 61, 168, 0.55),
+    2px 0 0 rgba(255, 180, 220, 0.55),
+    -2px 0 0 rgba(120, 0, 70, 0.48);
+  animation: hud-fall-glitch 2.4s steps(1, end) infinite;
+}
+
+@keyframes hud-fall-glitch {
+  0%,
+  88%,
+  88.4%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    filter: hue-rotate(0deg);
+  }
+
+  88.2% {
+    transform: translate3d(-2px, 1px, 0);
+    filter: hue-rotate(8deg);
+  }
+
+  88.28% {
+    transform: translate3d(1px, -1px, 0);
+    filter: hue-rotate(-6deg);
+  }
+
+  88.35% {
+    transform: translate3d(0, 0, 0);
+    filter: hue-rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud .hud-fall-char--spent,
+  #hud .hud-fall-char--terminal {
+    animation: none;
+  }
+}
+
+.run-over-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.run-over-dev-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 61, 168, 0.22);
+  width: 100%;
+  max-width: min(22rem, 100%);
+}
+
+/** Author `display: flex` above wins over the default `[hidden]` rule — match `.dev-bypass-wrap[hidden]`. */
+.run-over-dev-actions[hidden] {
+  display: none !important;
+}
+
 .hud-sep {
   margin: 0 0.35rem;
   opacity: 0.65;
+}
+
+#hud .hud-sep {
+  color: var(--hud-neon-magenta);
+  opacity: 0.55;
+  text-shadow: 0 0 6px rgba(255, 61, 168, 0.4);
 }
 
 .level-complete-scores {
@@ -361,7 +1291,8 @@ body {
   border: 3px solid var(--pack-orange);
   box-shadow:
     4px 4px 0 var(--pack-dark),
-    0 12px 40px rgba(0, 0, 0, 0.45);
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    var(--vs-hud-panel-glow-menu);
   image-rendering: pixelated;
 }
 

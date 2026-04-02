@@ -1,0 +1,154 @@
+/**
+ * CRT-style presentation layer. Intensity / timing come from CSS variables set by
+ * `applyVisualSettingsToDom` in `game/config/VisualSettings.js` (defaults in :root fallbacks).
+ */
+
+:root {
+  --crt-overlay-opacity: 0.42;
+  --crt-overlay-blur: 0.45px;
+  --crt-scanline-opacity: 0.065;
+  --crt-tint-bg: rgba(18, 20, 26, 0.052);
+  --crt-vignette-strong: rgba(0, 0, 0, 0.4);
+  --crt-vignette-soft: rgba(0, 0, 0, 0.16);
+  --crt-overlay-z: 50;
+  --crt-roll-duration: 5.8s;
+  --crt-flicker-duration: 4.2s;
+  --crt-glitch-duration: 11s;
+}
+
+html.vs-crt-off #app::after {
+  display: none !important;
+}
+
+#app::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: var(--crt-overlay-z);
+  pointer-events: none;
+  background-color: var(--crt-tint-bg);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, var(--crt-scanline-opacity)) 2px,
+    rgba(0, 0, 0, var(--crt-scanline-opacity)) 3px
+  );
+  box-shadow:
+    inset 0 0 120px var(--crt-vignette-strong),
+    inset 0 0 36px var(--crt-vignette-soft);
+  transform: translate3d(0, 0, 0);
+  filter: blur(var(--crt-overlay-blur));
+  animation:
+    crt-scan-roll var(--crt-roll-duration) linear infinite,
+    crt-flicker var(--crt-flicker-duration) steps(1, end) infinite,
+    crt-glitch var(--crt-glitch-duration) steps(1, end) infinite;
+}
+
+@keyframes crt-scan-roll {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 0 3px;
+  }
+}
+
+/**
+ * Irregular brightness wobble (tube power / phosphor decay).
+ * Opacity factors are relative to `--crt-overlay-opacity` so the master dial scales everything.
+ */
+@keyframes crt-flicker {
+  0%,
+  100% {
+    opacity: calc(var(--crt-overlay-opacity) * 1);
+  }
+
+  3% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.82);
+  }
+
+  3.05% {
+    opacity: calc(var(--crt-overlay-opacity) * 1);
+  }
+
+  7% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.96);
+  }
+
+  11.2% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.9);
+  }
+
+  11.25% {
+    opacity: calc(var(--crt-overlay-opacity) * 1);
+  }
+
+  41% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.98);
+  }
+
+  62.8% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.84);
+  }
+
+  62.85% {
+    opacity: calc(var(--crt-overlay-opacity) * 1);
+  }
+
+  78% {
+    opacity: calc(var(--crt-overlay-opacity) * 0.94);
+  }
+}
+
+/** Sparse horizontal tears / colour wobble — most of the cycle is still. */
+@keyframes crt-glitch {
+  0%,
+  88.4%,
+  88.55%,
+  100% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(0deg) saturate(1);
+  }
+
+  88.42% {
+    transform: translate3d(-5px, 2px, 0) skewX(-1.15deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(14deg) saturate(1.14);
+  }
+
+  88.48% {
+    transform: translate3d(4px, -2px, 0) skewX(0.85deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(-9deg) saturate(1.1);
+  }
+
+  88.52% {
+    transform: translate3d(-2px, 0, 0) skewX(-0.45deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(5deg) saturate(1.05);
+  }
+
+  94.1%,
+  94.2% {
+    transform: translate3d(0, 0, 0) skewX(0deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(0deg) saturate(1);
+  }
+
+  94.12% {
+    transform: translate3d(5px, 0, 0) skewX(0.85deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(-14deg) saturate(1.1);
+  }
+
+  94.16% {
+    transform: translate3d(-3px, 2px, 0) skewX(-0.55deg);
+    filter: blur(var(--crt-overlay-blur)) hue-rotate(10deg) saturate(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app::after {
+    animation: none;
+    opacity: var(--crt-overlay-opacity);
+    transform: none;
+    filter: blur(var(--crt-overlay-blur));
+  }
+}
