@@ -748,6 +748,7 @@ export class GameApplication {
     }
 
     if (states.is('runGameOver')) {
+      if (input.wasPressedEdge('Enter')) queue.enqueue({ type: 'RESTART_RUN' });
       if (input.wasPressedEdge('Escape')) queue.enqueue({ type: 'RETURN_TO_MENU' });
       return;
     }
@@ -776,7 +777,8 @@ export class GameApplication {
     if (!body) return;
 
     const marble = ControlSettings.marble;
-    const { torqueStrength, keys, brakeSteerTorqueScale } = marble;
+    const { torqueStrength, keys, brakeSteerTorqueScale, rollTorqueSpeedReference, rollTorqueSpeedExponent } =
+      marble;
 
     this._camForward.x = this._camTarget.x - this._camEye.x;
     this._camForward.y = 0;
@@ -817,10 +819,18 @@ export class GameApplication {
     const braking = this.input.isBrakeActive();
     const torqueMul = braking ? brakeSteerTorqueScale : 1;
 
+    /** Sublinear torque vs horizontal speed — same inputs at low speed; less “exponential” feel when already fast. */
+    const vx = body.velocity.x;
+    const vz = body.velocity.z;
+    const speedXZ = Math.hypot(vx, vz);
+    const ref = rollTorqueSpeedReference ?? 17;
+    const exp = rollTorqueSpeedExponent ?? 1.55;
+    const speedAtten = 1 / (1 + Math.pow(speedXZ / Math.max(0.001, ref), exp));
+
     if (vec3LengthSq(this._rollWant) >= 1e-10) {
       vec3Normalize(this._rollWant);
       vec3Cross(this._torqueAxis, this._worldUp, this._rollWant);
-      const ts = torqueStrength * torqueMul;
+      const ts = torqueStrength * torqueMul * speedAtten;
       this._torqueAxis.x *= ts;
       this._torqueAxis.y *= ts;
       this._torqueAxis.z *= ts;
@@ -949,7 +959,10 @@ export class GameApplication {
     const max = GameplaySettings.runMaxFalls;
     if (this._fallCount >= max) {
       this.states.setState('runGameOver');
-      this.ui.showRunGameOver();
+      this.ui.showRunGameOver({
+        coinsCollected: this.coinLedger.getRunGameOverTotal(),
+        coinsPossible: this.coinLedger.getRunPossibleTotal?.() ?? 0,
+      });
       return;
     }
     this.states.setState('marbleDead');

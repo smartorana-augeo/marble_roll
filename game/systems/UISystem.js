@@ -10,6 +10,8 @@ export class UISystem {
     this.menu = document.getElementById('screen-menu');
     this.levelComplete = document.getElementById('screen-level-complete');
     this.runGameOver = document.getElementById('screen-run-game-over');
+    this.runOverHint = document.getElementById('run-over-hint');
+    this.runOverCoins = document.getElementById('run-over-coins');
     this.hud = document.getElementById('hud');
     this.hudLevelName = document.getElementById('hud-level-name');
     this.hudFallsRow = document.getElementById('hud-falls-row');
@@ -290,7 +292,10 @@ export class UISystem {
     if (this.devBypassWrap) this.devBypassWrap.hidden = true;
   }
 
-  showRunGameOver() {
+  /**
+   * @param {{ coinsCollected: number, coinsPossible: number }} [stats]
+   */
+  showRunGameOver(stats) {
     this.appRoot?.classList.remove('app--playing');
     if (this.menu) {
       this.menu.hidden = true;
@@ -301,6 +306,20 @@ export class UISystem {
     if (this.runGameOver) {
       this.runGameOver.hidden = false;
       this.runGameOver.classList.add('screen--visible');
+    }
+    const maxFalls = GameplaySettings.runMaxFalls;
+    if (this.runOverHint) {
+      this.runOverHint.textContent = `${maxFalls} ${maxFalls === 1 ? 'fall' : 'falls'} — this run has ended. Press Enter to restart from level 1, or Escape for the main menu.`;
+    }
+    if (this.runOverCoins) {
+      if (stats && stats.coinsPossible > 0) {
+        const pct = Math.round((stats.coinsCollected / stats.coinsPossible) * 100);
+        this.runOverCoins.textContent = `Coins this run: ${stats.coinsCollected} / ${stats.coinsPossible} (${pct}%).`;
+        this.runOverCoins.hidden = false;
+      } else {
+        this.runOverCoins.textContent = '';
+        this.runOverCoins.hidden = true;
+      }
     }
     const showRestartCurrentLevel =
       this._devModeFromCheckbox() &&

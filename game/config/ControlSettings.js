@@ -6,6 +6,15 @@ export const ControlSettings = {
   marble: {
     /** Torque magnitude applied along world axes (cannon-es). */
     torqueStrength: 26,
+    /**
+     * Horizontal speed (|v.xz|) at which roll torque is scaled to ~50%. Tones down runaway spin-up at
+     * high speed while leaving low-speed acceleration unchanged.
+     */
+    rollTorqueSpeedReference: 17,
+    /**
+     * Power on (speed / reference): higher = sharper knee. ~1.4–1.8 avoids feeling exponential late.
+     */
+    rollTorqueSpeedExponent: 1.55,
     /** Upward impulse (N·s) at the centre of mass when jumping (mass ≈ 2). ~13 → Δv ≈ 6.5 m/s with g = 28. */
     jumpImpulse: 13,
     /**
