@@ -1,5 +1,7 @@
-import * as THREE from 'three';
 import { Vec3 } from 'cannon-es';
+import { WorldRenderer } from '../engine/gfx/WorldRenderer.js';
+import { SceneMesh } from '../engine/gfx/SceneMesh.js';
+import { vec3Cross, vec3LengthSq, vec3Normalize, vec3Set } from '../engine/gfx/math/Vec3.js';
 import { FrameCommandQueue } from './FrameCommandQueue.js';
 import { GameLoop } from './GameLoop.js';
 import { GameStateMachine } from './GameStateMachine.js';
@@ -15,8 +17,7 @@ import { applyControlBindingsToMenuKeys, DisplaySettings } from './config/Displa
 import { GameplaySettings } from './config/GameplaySettings.js';
 import { SceneLightingSettings } from './config/SceneLightingSettings.js';
 import { applyPixelWorldMapsToMaterials } from './rendering/pixelWorldMaps.js';
-import { createCoinHologramMaterial } from './rendering/coinHologramMaterial.js';
-import { setupSceneLighting } from './rendering/setupSceneLighting.js';
+import { createMaterialPalette } from './rendering/MaterialPalette.js';
 import { WorldNeonPulse } from './rendering/worldNeonPulse.js';
 import { wireMuteButtons } from './ui/wireMuteButtons.js';
 import { wireCreditsOverlay } from './ui/wireCredits.js';
@@ -101,7 +102,7 @@ export class GameApplication {
 
     /** @type {[number, number, number] | null} */
     this._spawn = null;
-    /** @type {{ position: THREE.Vector3, radius: number } | null} */
+    /** @type {{ position: { x: number, y: number, z: number }, radius: number } | null} */
     this._goal = null;
     /** @type {{ start: object, end: object } | null} */
     this._zones = null;
@@ -122,150 +123,41 @@ export class GameApplication {
     /** Falls this run; resets on new run or main menu (not on level advance). */
     this._fallCount = 0;
 
-    this.scene = new THREE.Scene();
-    /** Sky colour comes from CSS starfield behind the canvas (`alpha: true`). */
-    this.scene.background = null;
+    this.worldRenderer = new WorldRenderer(this.canvas, SceneLightingSettings);
+    this.worldRenderer.setDevicePixelRatioCap(2);
+    this.worldRenderer.setClearColor(0, 0, 0, 0);
 
-    this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 200);
-    this.camera.position.set(0, 10, 16);
+    this.renderMeshes = [];
+    this.marbleSceneMesh = new SceneMesh();
+    this.marbleSceneMesh.primitive = 'sphereHi';
+    this.marbleSceneMesh.materialKey = 'marble';
+    this.marbleSceneMesh.castShadow = true;
+    this.marbleSceneMesh.receiveShadow = false;
+    const mr = this.physics.marbleRadius;
+    this.marbleSceneMesh.scale.x = mr;
+    this.marbleSceneMesh.scale.y = mr;
+    this.marbleSceneMesh.scale.z = mr;
+    this.renderMeshes.push(this.marbleSceneMesh);
 
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: true,
-      alpha: true,
-    });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    /** Let CSS `#app::before` starfield show through the WebGL surface. */
-    this.renderer.setClearColor(0x000000, 0);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this._materials = createMaterialPalette();
 
-    setupSceneLighting(this.scene, SceneLightingSettings);
-
-    this._materials = {
-      static: new THREE.MeshStandardMaterial({
-        color: 0x711c91,
-        roughness: 0.96,
-        metalness: 0.03,
-        emissive: 0x2a0d38,
-        emissiveIntensity: 0.07,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-      }),
-      plaza: new THREE.MeshStandardMaterial({
-        color: 0x711c91,
-        roughness: 0.94,
-        metalness: 0.04,
-        emissive: 0x3d1560,
-        emissiveIntensity: 0.1,
-        polygonOffset: true,
-        polygonOffsetFactor: 3,
-        polygonOffsetUnits: 1,
-      }),
-      path: new THREE.MeshStandardMaterial({
-        color: 0x711c91,
-        roughness: 0.96,
-        metalness: 0.04,
-        emissive: 0x2a0d38,
-        emissiveIntensity: 0.06,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-      }),
-      pathWide: new THREE.MeshStandardMaterial({
-        color: 0xea00d9,
-        roughness: 0.9,
-        metalness: 0.06,
-        emissive: 0x6b0062,
-        emissiveIntensity: 0.12,
-        polygonOffset: true,
-        polygonOffsetFactor: 2,
-        polygonOffsetUnits: 1,
-      }),
-      ramp: new THREE.MeshStandardMaterial({
-        color: 0xea00d9,
-        roughness: 0.92,
-        metalness: 0.05,
-        emissive: 0x5c0054,
-        emissiveIntensity: 0.09,
-        polygonOffset: true,
-        polygonOffsetFactor: 2,
-        polygonOffsetUnits: 1,
-      }),
-      goal: new THREE.MeshStandardMaterial({
-        color: 0xff6b35,
-        emissive: 0x8b2500,
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.45,
-        roughness: 0.35,
-        metalness: 0.15,
-        depthWrite: false,
-      }),
-      zoneStart: new THREE.MeshStandardMaterial({
-        color: 0x0abdc6,
-        emissive: 0x045a61,
-        emissiveIntensity: 0.45,
-        transparent: true,
-        opacity: 0.58,
-        roughness: 0.38,
-        metalness: 0.22,
-        depthWrite: false,
-      }),
-      zoneEnd: new THREE.MeshStandardMaterial({
-        color: 0xff6b35,
-        emissive: 0x8b2500,
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.58,
-        roughness: 0.34,
-        metalness: 0.2,
-        depthWrite: false,
-      }),
-      lattice: new THREE.MeshStandardMaterial({
-        color: 0x0abdc6,
-        wireframe: true,
-        metalness: 0.1,
-        roughness: 0.9,
-        emissive: 0x045a61,
-        emissiveIntensity: 0.16,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-      }),
-      coin: createCoinHologramMaterial(),
-      marble: new THREE.MeshStandardMaterial({
-        color: 0xfff59a,
-        roughness: 0.14,
-        metalness: 0.42,
-        emissive: 0xffee00,
-        emissiveIntensity: 1.1,
-      }),
-    };
-
-    this._pixelWorldNoiseTexture = applyPixelWorldMapsToMaterials(this._materials);
+    this._pixelWorldNoiseTexture = applyPixelWorldMapsToMaterials(this._materials, this.worldRenderer);
 
     this._worldNeonPulse = new WorldNeonPulse();
     this._worldNeonPulse.capture(this._materials);
-
-    const marbleGeo = new THREE.SphereGeometry(this.physics.marbleRadius, 40, 32);
-    this.marbleMesh = new THREE.Mesh(marbleGeo, this._materials.marble);
-    this.marbleMesh.castShadow = true;
-    this.marbleMesh.receiveShadow = false;
-    this.scene.add(this.marbleMesh);
 
     /** Orbit angles (rad); independent of marble roll. */
     this._cameraYaw = ControlSettings.camera.initialYaw;
     this._cameraPitch = ControlSettings.camera.initialPitch;
 
-    this._tmpVec = new THREE.Vector3();
-    this._worldUp = new THREE.Vector3(0, 1, 0);
-    this._camForward = new THREE.Vector3();
-    this._camRight = new THREE.Vector3();
-    this._rollWant = new THREE.Vector3();
-    this._torqueAxis = new THREE.Vector3();
+    this._tmpVec = { x: 0, y: 0, z: 0 };
+    this._camEye = { x: 0, y: 10, z: 16 };
+    this._camTarget = { x: 0, y: 0, z: 0 };
+    this._worldUp = { x: 0, y: 1, z: 0 };
+    this._camForward = { x: 0, y: 0, z: 0 };
+    this._camRight = { x: 0, y: 0, z: 0 };
+    this._rollWant = { x: 0, y: 0, z: 0 };
+    this._torqueAxis = { x: 0, y: 0, z: 0 };
     this._torque = new Vec3();
 
     this._loop = new GameLoop((dt) => this._onFrame(dt));
@@ -498,7 +390,7 @@ export class GameApplication {
         this.coinLedger.startNewRun();
         this._fallCount = 0;
         this.coinRuntime.clear();
-        this.levelLoader.clear(this.physics.world, this.scene);
+        this.levelLoader.clear(this.physics.world, this.renderMeshes);
         this.physics.removeMarble();
         this._spawn = null;
         this._goal = null;
@@ -546,7 +438,7 @@ export class GameApplication {
       this.coinLedger.startNewRun();
       this._fallCount = 0;
       this.coinRuntime.clear();
-      this.levelLoader.clear(this.physics.world, this.scene);
+      this.levelLoader.clear(this.physics.world, this.renderMeshes);
       this.physics.removeMarble();
       this._spawn = null;
       this._goal = null;
@@ -757,10 +649,10 @@ export class GameApplication {
    */
   _applyLoadedLevel(descriptor, index) {
     console.log('[marble:flow] ⑨a levelLoader.clear');
-    this.levelLoader.clear(this.physics.world, this.scene);
+    this.levelLoader.clear(this.physics.world, this.renderMeshes);
     const tBuild = performance.now();
     console.log('[marble:flow] ⑨b levelLoader.build…');
-    const built = this.levelLoader.build(this.physics.world, this.scene, this._materials, descriptor);
+    const built = this.levelLoader.build(this.physics.world, this.renderMeshes, this._materials, descriptor);
     console.log(`[marble:flow] ⑨c LevelLoader.build done ${(performance.now() - tBuild).toFixed(1)}ms`);
     console.log(`[level] LevelLoader.build ${(performance.now() - tBuild).toFixed(1)}ms`);
     this._spawn = /** @type {[number, number, number]} */ ([
@@ -790,9 +682,7 @@ export class GameApplication {
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    this.camera.aspect = w / Math.max(1, h);
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h, false);
+    this.worldRenderer.setSize(w, h);
   }
 
   /**
@@ -834,7 +724,21 @@ export class GameApplication {
     }
 
     this._syncMarbleMesh();
-    this.renderer.render(this.scene, this.camera);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const aspect = w / Math.max(1, h);
+    this.worldRenderer.render(
+      {
+        fovDeg: 58,
+        aspect,
+        near: 0.1,
+        far: 200,
+        eye: this._camEye,
+        target: this._camTarget,
+      },
+      this.renderMeshes,
+      this._materials,
+    );
   }
 
   _enqueueInputCommands() {
@@ -895,30 +799,48 @@ export class GameApplication {
     const marble = ControlSettings.marble;
     const { torqueStrength, keys } = marble;
 
-    this.camera.getWorldDirection(this._camForward);
+    this._camForward.x = this._camTarget.x - this._camEye.x;
     this._camForward.y = 0;
-    if (this._camForward.lengthSq() < 1e-10) {
-      this._camForward.set(0, 0, -1);
+    this._camForward.z = this._camTarget.z - this._camEye.z;
+    let fLen = Math.hypot(this._camForward.x, this._camForward.z);
+    if (fLen < 1e-10) {
+      vec3Set(this._camForward, 0, 0, -1);
     } else {
-      this._camForward.normalize();
+      this._camForward.x /= fLen;
+      this._camForward.z /= fLen;
     }
 
-    this._camRight.crossVectors(this._camForward, this._worldUp);
-    if (this._camRight.lengthSq() < 1e-10) {
-      this._camRight.set(1, 0, 0);
+    vec3Cross(this._camRight, this._camForward, this._worldUp);
+    if (vec3LengthSq(this._camRight) < 1e-10) {
+      vec3Set(this._camRight, 1, 0, 0);
     } else {
-      this._camRight.normalize();
+      vec3Normalize(this._camRight);
     }
 
-    this._rollWant.set(0, 0, 0);
-    if (this.input.isDown(keys.forward)) this._rollWant.add(this._camForward);
-    if (this.input.isDown(keys.back)) this._rollWant.sub(this._camForward);
-    if (this.input.isDown(keys.left)) this._rollWant.sub(this._camRight);
-    if (this.input.isDown(keys.right)) this._rollWant.add(this._camRight);
+    vec3Set(this._rollWant, 0, 0, 0);
+    if (this.input.isDown(keys.forward)) {
+      this._rollWant.x += this._camForward.x;
+      this._rollWant.z += this._camForward.z;
+    }
+    if (this.input.isDown(keys.back)) {
+      this._rollWant.x -= this._camForward.x;
+      this._rollWant.z -= this._camForward.z;
+    }
+    if (this.input.isDown(keys.left)) {
+      this._rollWant.x -= this._camRight.x;
+      this._rollWant.z -= this._camRight.z;
+    }
+    if (this.input.isDown(keys.right)) {
+      this._rollWant.x += this._camRight.x;
+      this._rollWant.z += this._camRight.z;
+    }
 
-    if (this._rollWant.lengthSq() >= 1e-10) {
-      this._rollWant.normalize();
-      this._torqueAxis.crossVectors(this._worldUp, this._rollWant).multiplyScalar(torqueStrength);
+    if (vec3LengthSq(this._rollWant) >= 1e-10) {
+      vec3Normalize(this._rollWant);
+      vec3Cross(this._torqueAxis, this._worldUp, this._rollWant);
+      this._torqueAxis.x *= torqueStrength;
+      this._torqueAxis.y *= torqueStrength;
+      this._torqueAxis.z *= torqueStrength;
       this._torque.set(this._torqueAxis.x, this._torqueAxis.y, this._torqueAxis.z);
       body.applyTorque(this._torque);
     }
@@ -974,9 +896,12 @@ export class GameApplication {
     this._tmpVec.y = d * sp;
     this._tmpVec.z = -d * cp * cy;
 
-    this.camera.position.set(px + this._tmpVec.x, py + this._tmpVec.y, pz + this._tmpVec.z);
-    this.camera.lookAt(px, py, pz);
-    this.camera.updateMatrixWorld(true);
+    this._camEye.x = px + this._tmpVec.x;
+    this._camEye.y = py + this._tmpVec.y;
+    this._camEye.z = pz + this._tmpVec.z;
+    this._camTarget.x = px;
+    this._camTarget.y = py;
+    this._camTarget.z = pz;
   }
 
   _checkWinCondition() {
@@ -1049,20 +974,16 @@ export class GameApplication {
   _syncMarbleMesh() {
     const body = this.physics.marbleBody;
     if (!body) {
-      this.marbleMesh.visible = false;
+      this.marbleSceneMesh.visible = false;
       return;
     }
-    this.marbleMesh.visible = true;
-    this.marbleMesh.position.set(
-      body.interpolatedPosition.x,
-      body.interpolatedPosition.y,
-      body.interpolatedPosition.z,
-    );
-    this.marbleMesh.quaternion.set(
-      body.interpolatedQuaternion.x,
-      body.interpolatedQuaternion.y,
-      body.interpolatedQuaternion.z,
-      body.interpolatedQuaternion.w,
-    );
+    this.marbleSceneMesh.visible = true;
+    this.marbleSceneMesh.position.x = body.interpolatedPosition.x;
+    this.marbleSceneMesh.position.y = body.interpolatedPosition.y;
+    this.marbleSceneMesh.position.z = body.interpolatedPosition.z;
+    this.marbleSceneMesh.quaternion.x = body.interpolatedQuaternion.x;
+    this.marbleSceneMesh.quaternion.y = body.interpolatedQuaternion.y;
+    this.marbleSceneMesh.quaternion.z = body.interpolatedQuaternion.z;
+    this.marbleSceneMesh.quaternion.w = body.interpolatedQuaternion.w;
   }
 }

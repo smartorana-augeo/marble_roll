@@ -5,12 +5,12 @@ import { COIN_PICKUP_RADIUS } from '../level/CoinVisuals.js';
  */
 export class CoinPickupRuntime {
   constructor() {
-    /** @type {{ id: string, mesh: import('three').Mesh, collected: boolean }[]} */
+    /** @type {{ id: string, mesh: import('../../engine/gfx/SceneMesh.js').SceneMesh, collected: boolean }[]} */
     this._entries = [];
   }
 
   /**
-   * @param {{ id: string, mesh: import('three').Mesh }[]} coinEntries
+   * @param {{ id: string, mesh: import('../../engine/gfx/SceneMesh.js').SceneMesh }[]} coinEntries
    */
   load(coinEntries) {
     this._entries = coinEntries.map((e) => ({
@@ -54,7 +54,7 @@ export class CoinPickupRuntime {
         e.mesh.visible = false;
         picked++;
       } else {
-        e.mesh.rotation.y += deltaSeconds * 2.4;
+        e.mesh.eulerY += deltaSeconds * 2.4;
       }
     }
 

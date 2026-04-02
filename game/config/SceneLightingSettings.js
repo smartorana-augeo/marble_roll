@@ -1,7 +1,7 @@
 /**
- * Three.js scene lighting and fog — cooler than daylight, but fog/fill stay fairly neutral so
+ * Scene lighting and fog for the built-in renderer — cooler than daylight, but fog/fill stay fairly neutral so
  * the world does not read as a heavy blue wash.
- * Imported by {@link setupSceneLighting}; adjust colours and intensities only here.
+ * Consumed by `engine/gfx/WorldRenderer.js`; adjust colours and intensities only here.
  */
 
 const sceneLightingDefaults = Object.freeze({

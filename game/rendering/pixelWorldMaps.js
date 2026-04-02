@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { VisualSettings } from '../config/VisualSettings.js';
 
 /**
@@ -17,13 +16,13 @@ function mulberry32(seed) {
 }
 
 /**
- * Grey noise clustered around mid (128) so `roughnessMap` only gently modulates materials.
+ * Grey noise RGBA for roughness modulation.
  * @param {number} size
  * @param {number} seed
- * @param {number} [amplitude] max deviation from 128 per channel (0 = flat, 127 ≈ full-range noise)
- * @returns {THREE.DataTexture}
+ * @param {number} [amplitude]
+ * @returns {Uint8Array}
  */
-export function createPixelNoiseTexture(size, seed = 0x3d437c29, amplitude = 12) {
+export function createPixelNoiseRgba(size, seed = 0x3d437c29, amplitude = 12) {
   const data = new Uint8Array(size * size * 4);
   const rnd = mulberry32(seed);
   const mid = 128;
@@ -37,40 +36,27 @@ export function createPixelNoiseTexture(size, seed = 0x3d437c29, amplitude = 12)
     data[o + 2] = v;
     data[o + 3] = 255;
   }
-  const tex = new THREE.DataTexture(data, size, size);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.needsUpdate = true;
-  tex.colorSpace = THREE.NoColorSpace;
-  return tex;
+  return data;
 }
 
-const WORLD_KEYS = [
-  'static',
-  'plaza',
-  'path',
-  'pathWide',
-  'ramp',
-  'coin',
-  'marble',
-];
+const WORLD_KEYS = ['static', 'plaza', 'path', 'pathWide', 'ramp', 'coin', 'marble'];
 
 /**
  * One shared noise texture for platform marble/coin materials — cyber “pixel world” grain.
- * @param {Record<string, THREE.MeshStandardMaterial>} materials
- * @returns {THREE.DataTexture | null}
+ * @param {Record<string, object>} materials
+ * @param {import('../../engine/gfx/WorldRenderer.js').WorldRenderer} renderer
+ * @returns {WebGLTexture | null}
  */
-export function applyPixelWorldMapsToMaterials(materials) {
+export function applyPixelWorldMapsToMaterials(materials, renderer) {
   const w = VisualSettings.world3d;
   if (!w.pixelNoiseEnabled) return null;
-  const tex = createPixelNoiseTexture(w.noiseTextureSize, 0x3d437c29, w.roughnessNoiseAmplitude);
-  tex.repeat.set(w.textureRepeat, w.textureRepeat);
-  tex.needsUpdate = true;
+  const data = createPixelNoiseRgba(w.noiseTextureSize, 0x3d437c29, w.roughnessNoiseAmplitude);
+  const tex = renderer.createDataTextureRgba(data, w.noiseTextureSize);
   for (const key of WORLD_KEYS) {
     const m = materials[key];
-    if (!m || !(m instanceof THREE.MeshStandardMaterial)) continue;
+    if (!m || m.kind !== 'standard') continue;
     m.roughnessMap = tex;
-    m.needsUpdate = true;
+    m.roughnessUvScale = [w.textureRepeat, w.textureRepeat];
   }
   return tex;
 }

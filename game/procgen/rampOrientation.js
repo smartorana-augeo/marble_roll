@@ -3,7 +3,7 @@
  *
  * Documentation: **PROCEDURAL_L_SYSTEM_LEVELS.md** (ramp geometry); **LEVEL_DESIGN_AND_PROCEDURE.md** (ramp + jump situations).
  */
-import * as THREE from 'three';
+import { quatFromEulerYXZ } from '../../engine/gfx/math/Quat.js';
 
 /**
  * Builds a sloped box aligned with a horizontal step (dx, dz) and rise dy.
@@ -35,7 +35,8 @@ export function buildRampBox(p) {
   const midY = y + dy * 0.5;
   const midZ = z + dz * 0.5;
   const pitch = -Math.atan2(dy, hLen);
-  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+  const q = { x: 0, y: 0, z: 0, w: 1 };
+  quatFromEulerYXZ(q, pitch, yaw, 0);
   /** Conservative underside for kill plane (slightly below true OBB minimum). */
   const minYBottom = midY - hy - L * 0.5;
   return {
