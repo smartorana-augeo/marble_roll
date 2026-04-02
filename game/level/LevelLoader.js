@@ -1,11 +1,6 @@
 import { Body, Box, Vec3 } from 'cannon-es';
 import * as THREE from 'three';
 
-// ─── 2D level loader ──────────────────────────────────────────────────────────
-// `build2D` is a lightweight sibling that produces flat AABB platform arrays for
-// the Canvas 2D game mode.  No Three.js or cannon-es bodies are created.
-// ─────────────────────────────────────────────────────────────────────────────
-
 /** Straight / plaza meshes in the road pack are authored at roughly this span (world units). */
 const ROAD_TEXTURE_TILE_UNITS = 12;
 
@@ -135,36 +130,6 @@ export class LevelLoader {
       zones: hasZones ? descriptor.zones : null,
     };
   }
-
-  // ─── 2D ────────────────────────────────────────────────────────────────────
-
-  /**
-   * Build a 2D chunk from a procgen descriptor.  Applies a world-space X offset so
-   * consecutive chunks tile seamlessly.  Returns plain data — no rendering side-effects.
-   *
-   * @param {object} descriptor  Output of `generateProcgenDescriptor(index, '2d')`
-   * @param {number} [worldOffsetX=0]  X to add to every platform and to `endX`/`spawn`
-   * @returns {{
-   *   platforms: Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean,lattice?:boolean}>,
-   *   spawn: {x:number, y:number},
-   *   endX: number,
-   *   killPlaneY: number,
-   * }}
-   */
-  build2D(descriptor, worldOffsetX = 0) {
-    const platforms = descriptor.platforms.map((p) => ({
-      ...p,
-      x: p.x + worldOffsetX,
-    }));
-    return {
-      platforms,
-      spawn: { x: descriptor.spawn.x + worldOffsetX, y: descriptor.spawn.y },
-      endX: descriptor.endX + worldOffsetX,
-      killPlaneY: descriptor.killPlaneY,
-    };
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
 
   /**
    * @param {THREE.Material | THREE.Material[]} material

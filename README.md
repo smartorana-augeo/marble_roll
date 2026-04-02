@@ -1,5 +1,7 @@
 # Marble roll
 
+**3D** marble platformer (Three.js + cannon-es). The Canvas **2D** side-runner prototype lives on git branch **`preserve/2d-side-runner`**.
+
 Static web game served over HTTP (ES modules and asset fetches require a server; opening `index.html` from the file system is not supported).
 
 ## Play online

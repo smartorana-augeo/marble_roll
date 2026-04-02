@@ -199,23 +199,3 @@ export function placeObstacles(staticEntries, levelIndex, expandedLength, minSta
 
   return { static: arr, meta };
 }
-
-/**
- * Deterministically removes one interior platform to create a jump gap (2D mode).
- * @param {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>} platforms
- * @param {number} levelIndex
- * @param {number} minStaticCountForGap
- * @returns {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>}
- */
-export function placeObstacles2D(platforms, levelIndex, minStaticCountForGap) {
-  const n = platforms.length;
-  if (n <= minStaticCountForGap) return platforms.map((p) => ({ ...p }));
-
-  const arr = platforms.map((p) => ({ ...p }));
-  const iMin = 2;
-  const iMax = n - 2;
-  const hash = (levelIndex * 7919 + n * 31) >>> 0;
-  const gapIdx = iMin + (hash % (iMax - iMin + 1));
-  arr.splice(gapIdx, 1);
-  return arr;
-}

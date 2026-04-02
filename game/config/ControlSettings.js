@@ -45,26 +45,4 @@ export const ControlSettings = {
 
   /** Marble centre Y below spawn Y minus this value triggers a fall death. */
   fallDeathBelowSpawn: 12,
-
-  /** 2D side-runner player controls. */
-  player2d: {
-    /** Horizontal movement speed (world px / s). */
-    moveSpeed: 220,
-    /** Initial vertical velocity applied on jump (negative = upward in canvas coords). */
-    jumpForce: -530,
-    keys: {
-      left: 'ArrowLeft',
-      right: 'ArrowRight',
-      jump: 'Space',
-      altLeft: 'KeyA',
-      altRight: 'KeyD',
-      altJump: 'KeyW',
-    },
-  },
-
-  /** Gravity acceleration for 2D physics (world px / s²). */
-  gravity2d: 1400,
-
-  /** Player Y below this many world px below spawn triggers fall death (2D). */
-  fallDeathBelowSpawn2d: 420,
 };

@@ -34,37 +34,13 @@
  * @property {number} platformHalfExtentY Turtle default half-height on Y (world units).
  * @property {number} minVerticalSymbolLevelStride Divisor for §3.5 minimum `^`+`r` count before splices.
  * @property {number} minStaticCountForGap Minimum box count on path before a jump gap may be cut (exclusive: must be > this).
- * @property {boolean} useComptonRhythmLayer If true, build the spine from concatenated motifs (see `comptonRhythm.js`) instead of L-system expansion.
  * @property {number} connectivityMaxGapFactor Max horizontal centre–centre gap between consecutive path boxes vs turtle `step` (audit after turtle).
  * @property {number} comptonRhythmRepairMaxPasses When the audit fails, append forward symbols to the core and rebuild (capped).
- * @property {number} legacyLSystemMaxLength Safety cap on expanded string length when `useComptonRhythmLayer` is false.
- * @property {'gridDrunkard'|'legacyRhythm'} layoutBackend Spine layout: **gridDrunkard** (default) or legacy rhythm / L-system string.
  * @property {object} grid Drunkard-walk grid sizing and behaviour — see `gen/docs/PROCEDURAL_DRUNKARD_GRID_SPEC.md`.
  * @property {object} gridToSpine Emission: leading `F` run-up and **90°** turns for grid layouts.
  */
 
 export const GameplaySettings = {
-  /**
-   * 2D side-runner procgen geometry tuning (world px units).
-   * Used by `lSystemTurtlePlatforms2D` and the `'2d'` branch of `generateProcgenDescriptor`.
-   */
-  procgen2d: {
-    /** Width of one flat platform tile. */
-    tileW: 120,
-    /** Height (thickness) of platform tiles. */
-    tileH: 20,
-    /** Horizontal distance of a gap symbol (`+` / `-`). */
-    gapW: 90,
-    /** Vertical rise/drop per `^`, `v`, or `r` symbol. */
-    verticalStep: 72,
-    /** Y coordinate (canvas, top-surface) of the ground-floor level. */
-    baselineY: 400,
-    /** Max repair passes when connectivity audit fails. */
-    comptonRhythmRepairMaxPasses: 4,
-    /** Kill plane: this many px below `baselineY`. */
-    killPlanePadding: 380,
-  },
-
   /** Procedural level path width, presentation thresholds, and related tuning. */
   procgen: {
     pathPlatformHalfXZFloor: 1.08,
@@ -99,26 +75,10 @@ export const GameplaySettings = {
     minVerticalSymbolLevelStride: 3,
     /** `placeObstacles`: require more than this many static boxes to insert a gap (see §5.6). */
     minStaticCountForGap: 5,
-    /** Compton & Mateas-style motif concatenation for the main spine (replaces parallel L-system rewrite when true). */
-    useComptonRhythmLayer: true,
     /** Consecutive platform centres on XZ must stay within `step * connectivityMaxGapFactor`. */
     connectivityMaxGapFactor: 2.9,
-    /** Append `F` runs to the rhythm core and rebuild until the audit passes or this cap is hit. */
+    /** Append `F` runs to the core and rebuild until the audit passes or this cap is hit. */
     comptonRhythmRepairMaxPasses: 5,
-    /** Only used when `useComptonRhythmLayer` is false. */
-    legacyLSystemMaxLength: 120_000,
-
-    /**
-     * **gridDrunkard** — floor grid + drunkard walk + rooms + branches, then BFS main path → spine.  
-     * **legacyRhythm** — `composeRhythmSpineString` / `expandLSystem` as before (3D only).
-     */
-    layoutBackend: 'gridDrunkard',
-
-    /**
-     * When `layoutBackend === 'gridDrunkard'`, skip `ensureTurnBudget`, `ensureVerticalBudget`, and
-     * `applyLevelMapSplices` so the spine is not rewritten after grid emission; `preferRampsOverStepJumps` still runs.
-     */
-    gridSkipHeavyPostExpand: true,
 
     grid: {
       widthMin: 28,

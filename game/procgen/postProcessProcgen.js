@@ -1,6 +1,5 @@
 /**
  * Post-processing stages for procedural levels: widen, segment styles, obstacles, track offset, kill plane.
- * Also exports 2D variants (`placeObstacles2D`) used by the side-runner game mode.
  *
  * Documentation: **PROCEDURAL_L_SYSTEM_LEVELS.md** (§5, obstacles); **LEVEL_DESIGN_AND_PROCEDURE.md**
  * (§4 reference obstacles, §6 challenge knobs, §8 agency vs width); **THE_LADDER.md** (flavour hazards — roadmap).
@@ -230,28 +229,4 @@ export function placeObstacles(staticEntries, levelIndex, expandedLength) {
   }
 
   return { static: arr, meta };
-}
-
-// ─── 2D obstacle pass ─────────────────────────────────────────────────────────
-
-/**
- * Deterministically removes one interior platform to create a jump gap.
- * Skips the spawn pad (index 0) and the last platform (which holds the goal trigger).
- * Returns the platforms array unchanged when there are too few platforms for a safe gap.
- *
- * @param {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>} platforms
- * @param {number} levelIndex
- * @returns {Array<{x:number,y:number,w:number,h:number,materialKey:string,collision:boolean}>}
- */
-export function placeObstacles2D(platforms, levelIndex) {
-  const n = platforms.length;
-  if (n <= minStaticCountForGap) return platforms.map((p) => ({ ...p }));
-
-  const arr = platforms.map((p) => ({ ...p }));
-  const iMin = 2;                   // leave spawn pad + first real tile intact
-  const iMax = n - 2;               // leave last tile intact (goal boundary)
-  const hash = (levelIndex * 7919 + n * 31) >>> 0;
-  const gapIdx = iMin + (hash % (iMax - iMin + 1));
-  arr.splice(gapIdx, 1);
-  return arr;
 }

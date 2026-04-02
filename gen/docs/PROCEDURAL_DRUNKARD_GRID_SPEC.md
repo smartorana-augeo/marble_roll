@@ -2,7 +2,7 @@
 
 **Document type:** technical specification (target implementation)  
 **Code:** intended home `game/procgen/` (new modules) orchestrated by `generateProcgenDescriptor.js`  
-**Status:** **implemented** — `layoutBackend: 'gridDrunkard'` (default in `GameplaySettings.procgen`) runs `procgenRng.js`, `gridSpec.js`, `drunkardGrid.js`, `gridTopology.js`, `gridToSpine.js`, `gridSpinePipeline.js`, then the existing turtle and post-process chain. Set **`layoutBackend: 'legacyRhythm'`** to restore motif / L-system spines.
+**Status:** **implemented** — `generateProcgenDescriptor` runs `procgenRng.js`, `gridSpec.js`, `drunkardGrid.js`, `gridTopology.js`, `gridToSpine.js`, `gridSpinePipeline.js`, then the existing turtle and post-process chain.
 
 **Related documents**
 
@@ -20,7 +20,7 @@ Replace **only the implementation that chooses the course layout** (today: **mot
 
 **Non-goals for v1:** deleting legacy modules; full physics validation of every jump; gameplay features (gems, timers) beyond **hooks** in tile types.
 
-**Legacy code:** `composeRhythmSpineString`, `expandLSystem`, and related passes **remain** in the repository behind a **`GameplaySettings.procgen`** flag (name TBD, e.g. `layoutBackend: 'gridDrunkard' | 'legacyRhythm'`).
+**Unused modules:** `composeRhythmSpineString`, `expandLSystem`, and related files **remain** in the repository for reference and for the **`preserve/2d-side-runner`** branch; the main line generator does not call them.
 
 ---
 
@@ -62,7 +62,7 @@ flowchart TB
   end
   subgraph phaseE [Phase E — existing marble_roll]
     X0[Optional post-expand passes]
-    X1[turtleBuildPlatforms or turtleBuildPlatforms2D]
+    X1[turtleBuildPlatforms]
     X2[auditStaticPathGaps plus repair loop]
     X3[widenPlatforms applySegmentStyles placeObstacles applyTrackOffset]
   end
@@ -139,7 +139,7 @@ Stored in a compact array (e.g. `Uint8Array`), row-major indexing:
 
 ### 5.4 Spine and descriptor
 
-- **Phase D** produces a **`string`** compatible with `turtleBuildPlatforms` / `turtleBuildPlatforms2D` (see [PROCEDURAL_L_SYSTEM_LEVELS.md](PROCEDURAL_L_SYSTEM_LEVELS.md) §4).
+- **Phase D** produces a **`string`** compatible with `turtleBuildPlatforms` (see [PROCEDURAL_L_SYSTEM_LEVELS.md](PROCEDURAL_L_SYSTEM_LEVELS.md) §4).
 - The **level descriptor** shape returned by `generateProcgenDescriptor` remains unchanged: **`spawn`**, **`static`**, **`zones`**, **`killPlaneY`**, **`trackBaseY`**, **`procgenMeta`**.
 - **`procgenMeta`** should be extended with **grid-specific** fields (grid size, room count, branch count, backend id, repair statistics) for QA and tuning.
 
@@ -221,7 +221,6 @@ Introduce a **nested** `grid` (or equivalent) namespace, for example:
 
 | Key | Purpose |
 |-----|---------|
-| `layoutBackend` | `'gridDrunkard'` \| `'legacyRhythm'` |
 | `grid.widthMin` / `grid.widthMax` | Grid size bands |
 | `grid.heightMin` / `grid.heightMax` | Grid size bands |
 | `grid.pTurn` | Turn probability per step |
