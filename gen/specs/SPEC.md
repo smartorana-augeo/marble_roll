@@ -25,7 +25,7 @@ This slice proves **architecture** (bootstrap, game loop, state machine, command
 | Build | **None** required to run or ship (no Webpack, Vite, Rollup, etc.). |
 | Types | **JavaScript** only at authoring time (no mandatory TS). |
 | Entry | Exactly **one** root module referenced from `index.html` (e.g. `main.js`). Additional code is loaded via **ES module `import`** from that root, **not** via extra `<script>` tags that initialise the game. |
-| Rendering | WebGL via **[Three.js](https://threejs.org/)** (ES module build). |
+| Rendering | **Canvas 2D** CPU raster (`engine/gfx/WorldRenderer.js`); no WebGL or external 3D library. |
 | Physics | **[cannon-es](https://github.com/pmndrs/cannon-es)** (pure JavaScript rigid bodies). |
 | Libraries | Loaded through an **import map** in `index.html`, pointing either to a **CDN** or to **`vendor/`** copies for offline or pinned versions. |
 
@@ -173,7 +173,7 @@ flowchart TB
 | **FrameCommandQueue** | FIFO of `{ type, payload }`; **drained once per frame** at the defined phase; handlers registered by type. |
 | **InputSystem** | Keyboard polling; produces **no** gameplay side effects except enqueueing allowed commands from raw keys where appropriate (or states read input—either pattern is acceptable if documented; prefer enqueue from a thin input layer). |
 | **PhysicsSystem** | Owns **cannon-es** `World`; fixed timestep stepping; marble body; static bodies from level. |
-| **LevelLoader** | Given a level descriptor (procgen object or JSON-shaped static level), build Three.js meshes and cannon-es **box** bodies; **teardown** removes prior level entities from scene and world. Applies **segment visuals** from **`materialKey`** (and optional road diffuse maps — §5.2.1). |
+| **LevelLoader** | Given a level descriptor (procgen object or JSON-shaped static level), build **`SceneMesh`** instances and cannon-es **box** bodies; **teardown** removes prior level entities from the render list and physics world. Applies **segment visuals** from **`materialKey`** (see §5.2.1). |
 | **RenderSystem** | Sync physics transforms to meshes; `renderer.render`. |
 | **UISystem** | Show/hide overlays (menu, HUD hints, level complete). |
 
@@ -189,8 +189,8 @@ Held in a single **session** object (name may vary), including at least:
 **Normative for the current implementation** (`marble_roll`):
 
 - **Design layer:** For *why* courses are shaped and how obstacles are thought about, see **`gen/docs/LEVEL_DESIGN_AND_PROCEDURE.md`**. For the exact **L-system pipeline** and descriptor fields, see **`gen/docs/PROCEDURAL_L_SYSTEM_LEVELS.md`**.
-- **Separation:** Procedural **geometry** is defined entirely in **`game/procgen/`** (`generateProcgenDescriptor` → static box list with **`materialKey`**). The generator builds a **drunkard-grid** spine, injects **jump splits** (`^`/`v` + gap symbol **`j`**), then runs the turtle and post-processes. **Presentation** uses flat **`MeshStandardMaterial`** segment colours in **`LevelLoader`** (no diffuse road textures).
-- **Bootstrap:** After **`levels.json`** loads, **`GameApplication`** prepares **Three.js** materials once; no texture fetch is required for track surfaces.
+- **Separation:** Procedural **geometry** is defined entirely in **`game/procgen/`** (`generateProcgenDescriptor` → static box list with **`materialKey`**). The generator builds a **drunkard-grid** spine, injects **jump splits** (`^`/`v` + gap symbol **`j`**), then runs the turtle and post-processes. **Presentation** uses flat segment colours from **`createMaterialPalette()`** in **`LevelLoader`** (optional roughness noise via **`applyPixelWorldMapsToMaterials`**).
+- **Bootstrap:** After **`levels.json`** loads, **`GameApplication`** builds the material palette once; no road texture fetch is required for track surfaces.
 - **Build-time:** Each **non-lattice** box uses a single material from **`materialKey`** (`plaza`, `path`, `pathWide`, `ramp`, or fallback **`static`**); **`lattice`** and **zones** use their own materials.
 - **Specification detail:** `gen/docs/PROCEDURAL_L_SYSTEM_LEVELS.md` — turtle alphabet includes **`j`** (forward gap); see **`GameplaySettings.procgen.gridJumps`** for split spacing vs level index.
 
@@ -223,7 +223,7 @@ Per animation frame, in **this order**:
 2. **Drain command queue** — dispatch each command to registered handlers (may change state, load levels, enqueue further commands subject to re-entrancy cap).
 3. **Fixed update** — for `playing` only: accumulate time and step **cannon-es** at fixed dt (e.g. `1/60` s) until accumulator is below one step (standard fixed timestep pattern).
 4. **Variable update** — if `playing`: apply marble control forces/torques from input; update camera; test goal and possibly enqueue `GOAL_REACHED`. Other states: minimal updates (e.g. UI timers only).
-5. **Render** — sync rigid-body transforms to Three.js objects; render scene.
+5. **Render** — sync rigid-body transforms to **`SceneMesh`** instances; draw with **`WorldRenderer`**.
 
 ---
 
@@ -261,7 +261,7 @@ Each element of `levels` is an object:
 | Field | Type | Required |
 |-------|------|----------|
 | `type` | `"box"` | yes |
-| `halfExtents` | `[hx, hy, hz]` | yes — cannon-es / Three.js box half-sizes |
+| `halfExtents` | `[hx, hy, hz]` | yes — cannon-es box half-extents (same as scaled unit box mesh) |
 | `position` | `[x, y, z]` | yes — centre |
 | `quaternion` | `[x, y, z, w]` | optional — default `[0, 0, 0, 1]` |
 

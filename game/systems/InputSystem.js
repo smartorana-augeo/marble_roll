@@ -1,3 +1,18 @@
+/** Keys checked by {@link InputSystem.hasAnyGameplayEdge} (embed first-interaction). */
+const GAMEPLAY_EDGE_CODES = Object.freeze([
+  'KeyW',
+  'KeyA',
+  'KeyS',
+  'KeyD',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Space',
+  'ShiftLeft',
+  'ShiftRight',
+]);
+
 /**
  * Keyboard polling with edge detection for one-shot actions.
  */
@@ -35,7 +50,10 @@ export class InputSystem {
     for (const code of this._keys) {
       if (!this._prevKeys.has(code)) this._edgeDown.add(code);
     }
-    this._prevKeys = new Set(this._keys);
+    this._prevKeys.clear();
+    for (const code of this._keys) {
+      this._prevKeys.add(code);
+    }
   }
 
   /**
@@ -65,21 +83,8 @@ export class InputSystem {
    * @returns {boolean}
    */
   hasAnyGameplayEdge() {
-    const codes = [
-      'KeyW',
-      'KeyA',
-      'KeyS',
-      'KeyD',
-      'ArrowUp',
-      'ArrowDown',
-      'ArrowLeft',
-      'ArrowRight',
-      'Space',
-      'ShiftLeft',
-      'ShiftRight',
-    ];
-    for (const c of codes) {
-      if (this._edgeDown.has(c)) return true;
+    for (let i = 0; i < GAMEPLAY_EDGE_CODES.length; i++) {
+      if (this._edgeDown.has(GAMEPLAY_EDGE_CODES[i])) return true;
     }
     return false;
   }

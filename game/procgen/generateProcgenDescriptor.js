@@ -33,7 +33,6 @@ import {
 import { buildSpineFromDrunkardGrid } from './gridSpinePipeline.js';
 import { injectJumpSplitsInSpine } from './injectJumpSplitsInSpine.js';
 import { placeCoinsOnPath } from './placeCoins.js';
-import { procgenLogInfo } from './procgenLog.js';
 
 /** Marble radius matches PhysicsSystem default; pad is slightly wider than marble. */
 const ZONE_RADIUS = 0.62;
@@ -90,22 +89,16 @@ async function emitProcgenProgress(options, phase, fraction) {
  * @returns {Promise<object>} Level descriptor for `LevelLoader.build`
  */
 export async function generateProcgenDescriptor(levelIndex, options = undefined) {
-  console.log('[marble:flow] ⑦a generateProcgenDescriptor enter', { levelIndex });
   // Yield before any heavy sync work so the load screen can paint and show phase text.
   await emitProcgenProgress(options, 'grid', 0);
 
-  const tAll = performance.now();
   const iterations = procgenLSystemIterations(levelIndex);
   const step = procgenTurtleStep(levelIndex);
   const pg = GameplaySettings.procgen;
   const verticalStep = pg.verticalStep;
   const jumpClearance = pg.jumpClearance;
 
-  const tGrid0 = performance.now();
-  console.log('[marble:flow] ⑦b buildSpineFromDrunkardGrid (sync)…');
   const gridBundle = buildSpineFromDrunkardGrid(levelIndex, pg);
-  const gridMs = performance.now() - tGrid0;
-  console.log('[marble:flow] ⑦c grid spine done', { gridMs: Number(gridMs.toFixed(1)) });
   await emitProcgenProgress(options, 'grid', PG_W_GRID);
 
   let core = gridBundle.spine;
@@ -163,7 +156,6 @@ export async function generateProcgenDescriptor(levelIndex, options = undefined)
     'turtle',
     PG_W_GRID + PG_W_INJECT + PG_W_TURTLE,
   );
-  const turtleMs = performance.now() - tTurtle0;
 
   const stepsPerSplice = Math.max(
     2,
@@ -206,32 +198,8 @@ export async function generateProcgenDescriptor(levelIndex, options = undefined)
 
   const coins = placeCoinsOnPath(offset.static, offset.zones.end, levelIndex, step);
   await emitProcgenProgress(options, 'coins', 1);
-  const postMs = performance.now() - tPost0;
-  const totalMs = performance.now() - tAll;
-
-  procgenLogInfo(`level ${levelIndex} descriptor ready`, {
-    totalMs: Number(totalMs.toFixed(2)),
-    gridMs: Number(gridMs.toFixed(2)),
-    turtleAndConnectivityMs: Number(turtleMs.toFixed(2)),
-    postProcessMs: Number(postMs.toFixed(2)),
-    gridAttempts: gridBundle.gridAttempts,
-    jumpSplits: injected.jumpSplitCount,
-    gapJumps: injected.gapJumpCount,
-    heightJumps: injected.heightJumpCount,
-    repairPasses,
-    spineLength: expanded.length,
-    staticBoxes: offset.static.length,
-    connectivityOk: lastAudit.ok,
-    maxGapXZ: lastAudit.maxGapXZ,
-  });
 
   const displayName = String(levelIndex + 1);
-
-  console.log('[marble:flow] ⑦z generateProcgenDescriptor complete', {
-    levelIndex,
-    totalMs: Number((performance.now() - tAll).toFixed(1)),
-    id: `procgen_${levelIndex}`,
-  });
 
   return {
     id: `procgen_${levelIndex}`,

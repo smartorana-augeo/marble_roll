@@ -45,7 +45,7 @@ const WORLD_KEYS = ['static', 'plaza', 'path', 'pathWide', 'ramp', 'coin', 'marb
  * One shared noise texture for platform marble/coin materials — cyber “pixel world” grain.
  * @param {Record<string, object>} materials
  * @param {import('../../engine/gfx/WorldRenderer.js').WorldRenderer} renderer
- * @returns {WebGLTexture | null}
+ * @returns {{ width: number, height: number, data: Uint8Array } | null}
  */
 export function applyPixelWorldMapsToMaterials(materials, renderer) {
   const w = VisualSettings.world3d;

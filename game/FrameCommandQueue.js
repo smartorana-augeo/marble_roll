@@ -32,7 +32,6 @@ export class FrameCommandQueue {
     while (this._queue.length > 0 && passes < maxPasses) {
       const batch = this._queue.splice(0, this._queue.length);
       for (const { type, payload } of batch) {
-        console.log('[marble:flow] drain →', type);
         const handler = this._handlers.get(type);
         if (handler) {
           handler(payload);

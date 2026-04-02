@@ -11,34 +11,28 @@ const visualSettingsDefaults = Object.freeze({
   crt: Object.freeze({
     enabled: true,
     /**
-     * Master strength for the whole `::after` stack (scanlines, tint, vignette, flicker).
-     * Flicker keyframes in `crtOverlay.css` multiply by this so dips stay proportional.
+     * Master strength for the whole `::after` stack (scanlines, tint, vignette).
      */
-    overlayOpacity: 0.42,
-    /** Softens scanlines / tint so the stack reads as atmosphere, not crisp UI chrome. */
-    overlayBlurPx: 0.45,
-    scanlineOpacity: 0.065,
-    tint: Object.freeze({ r: 18, g: 20, b: 26, a: 0.052 }),
-    vignetteStrong: 'rgba(0, 0, 0, 0.4)',
-    vignetteSoft: 'rgba(0, 0, 0, 0.16)',
+    overlayOpacity: 0.34,
+    scanlineOpacity: 0.052,
+    tint: Object.freeze({ r: 18, g: 20, b: 26, a: 0.068 }),
+    vignetteStrong: 'rgba(0, 0, 0, 0.41)',
     overlayZ: 50,
-    rollDurationSec: 5.8,
-    flickerDurationSec: 4.2,
-    glitchDurationSec: 11,
+    /** Scan-line drift — sole CRT motion in the perf build (`crtOverlay.css`). */
+    rollDurationSec: 9,
     /**
-     * Starfield layer (`#app::before`): drift + transform wobble + faint grain.
-     * Tuned for few compositor-friendly properties (no animated filter).
+     * Starfield layer (`#app::before`): drift + transform wobble + faint grain (`styles.css`).
+     * Compositor-only (transform / opacity / background-position) — no game-thread or canvas cost.
      */
     backgroundWobble: Object.freeze({
       enabled: true,
-      /** Background drift + grain slide (seconds). Longer = fewer keyframe updates per minute. */
-      driftDurationSec: 26,
-      /** Sub-pixel transform wobble (seconds). */
-      wobbleDurationSec: 12,
-      /** Reserved: opacity flutter is merged into drift keyframes (same duration). */
-      grainDriftDurationSec: 26,
-      /** Grain stripe strength — keep low (second layer costs a composite). */
-      grainOpacity: 0.038,
+      /** Slow drift keeps motion visible without busy keyframes. */
+      driftDurationSec: 38,
+      /** Gentle sub-pixel wobble; longer = calmer layer promotion. */
+      wobbleDurationSec: 22,
+      grainDriftDurationSec: 38,
+      /** Faint grain strip — low alpha limits blend work from the repeating gradient. */
+      grainOpacity: 0.014,
     }),
   }),
   hud: Object.freeze({
@@ -47,13 +41,41 @@ const visualSettingsDefaults = Object.freeze({
       '0 0 12px rgba(93, 232, 255, 0.28), 0 0 28px rgba(255, 61, 168, 0.14), inset 0 0 20px rgba(93, 232, 255, 0.06)',
     panelGlowMenu:
       '0 0 10px rgba(93, 162, 240, 0.22), 0 0 22px rgba(242, 142, 43, 0.1), inset 0 0 16px rgba(93, 162, 240, 0.05)',
+    /** When false, `html.vs-hud-fall-glitch-off` removes jitter on fall-count glyphs (`styles.css`). */
+    fallGlitchEnabled: true,
   }),
   buttons: Object.freeze({
+    /** When false, `html.vs-btn-glitch` is unset — no cyber/menu title keyframe glitch. */
     cyberGlitchEnabled: true,
-    cyberGlitchPeriodSec: 4.6,
+    /** Slightly slower than the old default so bursts feel less frantic (still compositor-only). */
+    cyberGlitchPeriodSec: 5.2,
   }),
   world3d: Object.freeze({
-    pixelNoiseEnabled: true,
+    /**
+     * Backing-store pixels are at most (CSS px × DPR × this). Primary FPS lever for the CPU rasteriser
+     * (cost ∝ pixels). Prefer ~0.5–0.55 for smooth play on the CPU rasteriser.
+     */
+    internalResolutionScale: 0.5,
+    /**
+     * Caps `devicePixelRatio` for the backing store; pairs with `internalResolutionScale`.
+     */
+    devicePixelRatioCap: 1.15,
+    /**
+     * Roughness “grain” texture sampled per shaded vertex — costs CPU; off keeps materials flat and cleaner.
+     */
+    pixelNoiseEnabled: false,
+    /**
+     * When false, platform / path / zone / marble materials keep static emissive (no sine waves each frame).
+     */
+    neonPulseSurfaces: false,
+    /**
+     * Fewer trig ops when hologram coins are animated — ignored while `coinHologramStatic` is true.
+     */
+    coinHologramReduced: true,
+    /**
+     * When true, coin hologram uniforms stay fixed (no in-world pulse / glitch drive). Glitch styling is UI-only.
+     */
+    coinHologramStatic: true,
     noiseTextureSize: 128,
     /** Shared UV repeat for roughness map grain */
     textureRepeat: 8,
@@ -78,15 +100,11 @@ export function applyVisualSettingsToDom(root = document.documentElement) {
   const t = c.tint;
   root.style.setProperty('--vs-crt-enabled', c.enabled ? '1' : '0');
   root.style.setProperty('--crt-overlay-opacity', String(c.overlayOpacity));
-  root.style.setProperty('--crt-overlay-blur', `${c.overlayBlurPx}px`);
   root.style.setProperty('--crt-scanline-opacity', String(c.scanlineOpacity));
   root.style.setProperty('--crt-tint-bg', `rgba(${t.r}, ${t.g}, ${t.b}, ${t.a})`);
   root.style.setProperty('--crt-vignette-strong', c.vignetteStrong);
-  root.style.setProperty('--crt-vignette-soft', c.vignetteSoft);
   root.style.setProperty('--crt-overlay-z', String(c.overlayZ));
   root.style.setProperty('--crt-roll-duration', `${c.rollDurationSec}s`);
-  root.style.setProperty('--crt-flicker-duration', `${c.flickerDurationSec}s`);
-  root.style.setProperty('--crt-glitch-duration', `${c.glitchDurationSec}s`);
   const bw = c.backgroundWobble;
   root.style.setProperty('--vs-crt-bg-wobble', bw.enabled ? '1' : '0');
   root.style.setProperty('--crt-bg-drift-duration', `${bw.driftDurationSec}s`);
@@ -99,4 +117,5 @@ export function applyVisualSettingsToDom(root = document.documentElement) {
   root.style.setProperty('--vs-btn-glitch-duration', `${b.cyberGlitchPeriodSec}s`);
   root.classList.toggle('vs-crt-off', !c.enabled);
   root.classList.toggle('vs-btn-glitch', b.cyberGlitchEnabled);
+  root.classList.toggle('vs-hud-fall-glitch-off', !h.fallGlitchEnabled);
 }

@@ -24,7 +24,7 @@ export function quatNormalize(q) {
 }
 
 /**
- * YXZ intrinsic order (matches prior Three.js Euler(pitch,yaw,roll,'YXZ') usage).
+ * YXZ intrinsic order (common for yaw/pitch/roll rigs).
  * @param {{ x: number, y: number, z: number, w: number }} out
  * @param {number} pitchRad
  * @param {number} yawRad

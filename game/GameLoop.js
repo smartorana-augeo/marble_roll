@@ -29,8 +29,10 @@ export class GameLoop {
    */
   _tick(ts) {
     if (!this._running) return;
-    const deltaMs = Math.min(100, ts - this._lastTs);
-    this._lastTs = ts;
+    const now = typeof performance !== 'undefined' ? performance.now() : ts;
+    /** Clamp: avoid 0 ms (coalesced frames) and huge hitches (tab background). */
+    const deltaMs = Math.min(100, Math.max(0.5, now - this._lastTs));
+    this._lastTs = now;
     const deltaSeconds = deltaMs / 1000;
     this._onFrame(deltaSeconds);
     this._rafId = requestAnimationFrame(this._boundTick);

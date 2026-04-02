@@ -2,7 +2,7 @@
 
 **Document type:** technical specification  
 **Code:** `game/procgen/` in the `marble_roll` project  
-**Status:** The **shipped pipeline** is **grid drunkard-walk** → **`preferRampsOverStepJumps`** → turtle → widen → **`applySegmentStyles`** → obstacles → offset (see §2). Legacy **§§3.4–3.7** passes (turn budget, vertical budget, **level-map splices**) apply to **older** motif/L-system spines kept for reference, not to the grid spine. **§4** (turtle alphabet), **§§5.1–5.7** (widths, zones, descriptor, **`trackBaseY`**, obstacles), **`procgenMeta`** (§5.4), and **§5.8** (road presentation) remain **normative** for the descriptor contract.
+**Status:** The **shipped pipeline** is **grid drunkard-walk** → **`preferRampsOverStepJumps`** → turtle → widen → **`applySegmentStyles`** → obstacles → offset (see §2). Legacy **§§3.4–3.7** passes (turn budget, vertical budget, **level-map splices**) apply to **older** motif/L-system spines kept for reference, not to the grid spine. **§4** (turtle alphabet), **§§5.1–5.7** (widths, zones, descriptor, **`trackBaseY`**, obstacles), **`procgenMeta`** (§5.4), and **§5.8** (visual presentation) remain **normative** for the descriptor contract.
 
 **Relationship to design methodology:** `LEVEL_DESIGN_AND_PROCEDURE.md` describes **goals** (skills, affordances, obstacle vocabulary, agency, roadmap). **`PROCGEN_COMPTON_MATEAS.md`** tracks rhythm and connectivity methodology. **`PROCEDURAL_DRUNKARD_GRID_SPEC.md`** specifies the **implemented** grid layout backend. **This document** still defines the **turtle alphabet**, **descriptor shape**, and presentation mapping; the **spine source** is the grid pipeline unless you restore older code from git (e.g. branch **`preserve/2d-side-runner`**).
 
@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-Levels are **not** authored as static JSON geometry for the main run. Each rung is **generated at load time** from a **symbol spine** produced by the **drunkard grid** pipeline ([PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md)), then **`preferRampsOverStepJumps`**. The spine defines a **single main forward path**: a continuous centreline over a **horizontal** grid that **turns** at right angles (`+` / `−` with **90°** turtle turns). A **turtle** then lays **horizontal tiles**, **sloped ramps** (`r`), and **height changes** (`^` / `v`) where present, with **start** and **end** touch zones at the path extremities. Post-stages assign **deterministic** widths and **`materialKey`** labels (**`plaza`**, **`path`**, **`pathWide`**, **`ramp`**) so `LevelLoader` can style segments. **Geometry and physics** come only from the descriptor; **presentation** is either **diffuse-mapped road tops** (when textures load) or **flat `MeshStandardMaterial` colours** (fallback) — see §5.8.
+Levels are **not** authored as static JSON geometry for the main run. Each rung is **generated at load time** from a **symbol spine** produced by the **drunkard grid** pipeline ([PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md)), then **`preferRampsOverStepJumps`**. The spine defines a **single main forward path**: a continuous centreline over a **horizontal** grid that **turns** at right angles (`+` / `−` with **90°** turtle turns). A **turtle** then lays **horizontal tiles**, **sloped ramps** (`r`), and **height changes** (`^` / `v`) where present, with **start** and **end** touch zones at the path extremities. Post-stages assign **deterministic** widths and **`materialKey`** labels (**`plaza`**, **`path`**, **`pathWide`**, **`ramp`**) so `LevelLoader` can style segments. **Geometry and physics** come only from the descriptor; **presentation** is **flat segment colours** from the material palette (optional roughness noise) — see §5.8.
 
 This document specifies the **L formula** (axiom, production rules, iterations), **post-expansion string passes**, the **turtle alphabet**, numerical parameters, **budgets**, **segment styling**, **obstacles**, **`trackBaseY`**, the **level descriptor** contract for `LevelLoader.build`, and how **`materialKey`** maps to **visuals** without changing the procgen contract.
 
@@ -24,8 +24,8 @@ Generation is a **staged pipeline**. Stages after the turtle may reorder, widen,
 flowchart TB
   subgraph boot [Once per session — GameApplication.start]
     manifest[levels.json]
-    roadTex[loadRoadTextures optional]
-    manifest -.->|fetch| roadTex
+    palette[Material palette + optional pixel noise]
+    manifest -.->|fetch| palette
   end
   subgraph procgen [Per level index — deterministic geometry]
     gen[generateProcgenDescriptor]
@@ -53,10 +53,10 @@ flowchart TB
   loader[LevelLoader.build]
   manifest -.->|procgen manifest| gen
   offset --> loader
-  roadTex -.->|materials.roadStraight / roadPlaza| loader
+  palette -.->|materials| loader
 ```
 
-**Bootstrap vs procgen:** **`loadRoadTextures`** runs **once** after the manifest is fetched; it does **not** read the L-string and does **not** affect **`generateProcgenDescriptor`**. It only populates optional **`THREE.Texture`** references on the materials object passed into **`LevelLoader.build`**. If loading fails, **`roadStraight`** is absent and §5.8 fallback applies.
+**Bootstrap vs procgen:** **`levels.json`** is fetched once; **`createMaterialPalette`** runs at game start. Optional **`applyPixelWorldMapsToMaterials`** may attach a CPU noise texture to materials for the Canvas rasteriser. None of this reads the L-string or affects **`generateProcgenDescriptor`**.
 
 1. **`levels.json`** supplies `procgen: true`, optional **`levelCount`** (finite run), optional **`infiniteLevels`** (procgen run does not end after `levelCount`), and `schemaVersion` (read before first level; same fetch is the entry point for the procgen pipeline below). The HUD uses **1-based numeric labels** from the level index, not a name list.
 2. **Spine string:** the spine comes from the **drunkard grid** pipeline ([PROCEDURAL_DRUNKARD_GRID_SPEC.md](PROCEDURAL_DRUNKARD_GRID_SPEC.md)). Older **motif / L-system** helpers (`comptonRhythm.js`, `lSystemExpand.js`) remain in the tree for reference but are **not** used by `generateProcgenDescriptor`. A **connectivity audit** (`auditStaticPathGaps`) runs after the turtle; failed audits **append** forward symbols to the core and **rebuild** (capped by **`comptonRhythmRepairMaxPasses`**).
@@ -68,7 +68,7 @@ flowchart TB
 8. **`applySegmentStyles`** assigns **deterministic** half-extents and **`materialKey`** (`plaza` / `path` / `pathWide` / `ramp`) for a wide start pad and narrower runs.
 9. **`placeObstacles`** (normative) inserts **1–2 obstacle sites** per level (§5.6); obstacle hashes may use the **spine** string length **before** splices for stable indexing against the forward path.
 10. **`applyTrackOffset`** (normative) adds a per-level **`trackBaseY`** to all platform centres, zones, and spawn (§5.7).
-11. **`LevelLoader.build`** instantiates physics and visuals from the final descriptor (§5.8 maps **`materialKey`** to materials or textured faces).
+11. **`LevelLoader.build`** instantiates physics and visuals from the final descriptor (§5.8 maps **`materialKey`** to palette entries).
 
 **Source modules (for traceability):**
 
@@ -82,10 +82,10 @@ flowchart TB
 | Widen, segment styles, obstacles, offset, kill plane | `postProcessProcgen.js` |
 | Path width decay, procgen gameplay tuning | `GameplaySettings.js` |
 | Orchestration | `generateProcgenDescriptor.js` |
-| Road diffuse load (bootstrap) | `loadRoadTextures.js` |
+| Optional roughness noise (bootstrap) | `pixelWorldMaps.js`, `WorldRenderer.js` |
 | Static mesh + body build, §5.8 presentation | `LevelLoader.js` |
 
-**Code ↔ documentation map:** implementation modules under `game/procgen/` (and `GameplaySettings.procgen`, `LevelLoader`, optional `loadRoadTextures`) carry file-level comments pointing to:
+**Code ↔ documentation map:** implementation modules under `game/procgen/` (and `GameplaySettings.procgen`, `LevelLoader`, optional `pixelWorldMaps`) carry file-level comments pointing to:
 
 | Document | Role |
 |----------|------|
@@ -257,27 +257,17 @@ The expanded string is scanned **left to right**. State: position **`(x, z)`**, 
 
 There is **no** separate global safety floor under the map; only **tile** geometry (plus obstacle rules) exists.
 
-### 5.8 Road presentation (`LevelLoader` + optional textures)
+### 5.8 Visual presentation (`LevelLoader` + `WorldRenderer`)
 
-**Scope:** **Rendering only.** Cannon-es **`Box`** shapes, descriptor **`halfExtents`**, **`position`**, **`quaternion`**, and **`materialKey`** semantics are **unchanged** by this layer. Missing or failed texture loads **do not** alter procgen output — they only change whether boxes use **solid segment materials** or **textured tops**.
+**Scope:** **Rendering only.** Cannon-es **`Box`** shapes, descriptor **`halfExtents`**, **`position`**, **`quaternion`**, and **`materialKey`** semantics are **unchanged** by this layer.
 
-**Assets (minimal runtime set):** diffuse images under **`marble_roll/assets/road/`**, currently **`Road1_B.png`** (straight / path / ramp tops) and **`Road6_B.png`** (spawn **`plaza`** top). These align with the modular road pack’s straight and end-cap atlases; the full **`obj`/`dae`** catalogue is **not** required for the floating-course boxes.
+The shipped build uses a **Canvas 2D** CPU rasteriser (`engine/gfx/WorldRenderer.js`). **`LevelLoader.build`** instantiates **`SceneMesh`** primitives (unit **box** / **sphere** / **cylinder**, scaled from **`halfExtents`** or radii) and assigns **`materialKey`**. **`createMaterialPalette()`** supplies flat PBR-style parameters per key; **`applyPixelWorldMapsToMaterials`** may optionally attach a small **RGBA noise** buffer for roughness variation in the CPU shader.
 
-**Bootstrap:** **`GameApplication.start`** calls **`loadRoadTextures()`** after **`levels.json`** resolves. On success, **`materials.roadStraight`** and **`materials.roadPlaza`** are set on the shared materials object. On failure, a **warning** is logged and those keys stay **undefined** (flat colours).
+**Unit box mesh:** **`GeometryTemplates.buildUnitBoxTriangles`** — faces in **+Z, −Z, +X, −X, +Y, −Y** order; **+Y** is the **walkable top** in mesh space. **`lattice`** tiles use **wireframe** line primitives instead of filled boxes.
 
-**Mapping `materialKey` → texture choice:**
+**Lifecycle:** **`LevelLoader.clear`** removes meshes from the render list and physics world. Materials persist for the session.
 
-| `materialKey` | Top-face diffuse source |
-|---------------|-------------------------|
-| **`plaza`** | **`roadPlaza`** (falls back to **`roadStraight`** if plaza texture missing) |
-| **`path`**, **`pathWide`** | **`roadStraight`** |
-| **`ramp`** | **`roadStraight`**, with a **light green colour multiply** on the top **`MeshStandardMaterial`** for readability |
-
-**Mesh construction:** When **`roadStraight`** is present, each **non-lattice** box uses a **six-material** **`BoxGeometry`** (Three.js face order: **+X, −X, +Y, −Y, +Z, −Z**). The **+Y** face is the **walkable top in mesh space**; it receives a **clone** of the chosen diffuse with **`repeat`** set from tile size **`(2·hx, 2·hz)`** and a fixed **authoring span** of **12** world units per texture tile (**`ROAD_TEXTURE_TILE_UNITS`**), matching the straight road mesh scale in the source pack. **Side** faces use a dark solid material (varies slightly by segment type). **`lattice`** tiles skip road mapping and use the wireframe lattice material.
-
-**Lifecycle:** On **`LevelLoader.clear`**, per-mesh **cloned** texture instances attached to materials are **disposed** with the mesh. Base textures loaded at bootstrap persist for the session.
-
-**Determinism:** Texture availability does **not** affect §6 — same **`levelIndex`** yields the same descriptor and physics whether or not road PNGs loaded.
+**Determinism:** Visual options do **not** affect §6 — same **`levelIndex`** yields the same descriptor and physics regardless of optional noise.
 
 ### 5.2 Start and end zones
 
@@ -357,12 +347,12 @@ Changing **§5.8** texture filenames, **`ROAD_TEXTURE_TILE_UNITS`**, face-select
 | 4 | 2026-03-30 | **Vertical jumps**: turtle **`^`** / **`v`**, **`verticalStep`**, rule variants with **`^`**; §3.5 **vertical budget** and **`^F`** injection; end zone at last tile top; **`verticalSymbolCount`** / **`minVerticalSymbolCount`** in meta |
 | 5 | 2026-03-30 | **Course look**: turtle **`r`** (sloped ramp), **`preferRampsOverStepJumps`**, **`applySegmentStyles`** (plaza / path / pathWide / ramp), tighter **`angleDeg`**, ramp-aware **widen**; flat **materialKey** colours in **`LevelLoader`** |
 | 6 | 2026-03-30 | Spec sync: **status** and §1 purpose; **module table**; **§3.6** `preferRamps` formula; **§4** ramp maths; **§5.1** numeric segment rules; **§5.4** static schema + **`trackBaseY`**; **§5.5** `computeTrackBaseY`; **§6** determinism; remove stub pipeline note |
-| 7 | 2026-03-29 | **§5.8** road presentation: **`loadRoadTextures`**, **`assets/road/`** PNGs, **`LevelLoader`** six-face boxes, bootstrap vs procgen in §2 diagram; §1 / §5.1 / §6 cross-links; module table rows |
+| 7 | 2026-03-29 | **§5.8** visual presentation: Canvas **`WorldRenderer`**, **`LevelLoader`** meshes, bootstrap vs procgen in §2 diagram; §1 / §5.1 / §6 cross-links; module table rows |
 | 8 | 2026-03-29 | **Main spine** (non-branching rules §3.2); **`applyLevelMapSplices`** §3.7; pipeline and **`procgenMeta`** updated; first rung unspliced |
 | 9 | 2026-03-29 | **`GameplaySettings.js`**: level-scaled path width (early wider, decays to floor **1.08**); **`widenPlatforms(static, levelIndex)`**; §5.1 updated |
 | 10 | 2026-03-29 | Weaving spine rules; **`+F-`/`-F+`** turn injection; higher **`minTurnCount`**; wider **`angleDeg`**; iterations **3–5**; early path ≈2× width + larger **`plazaHalfXZ`** |
 | 11 | 2026-03-29 | Shorter early rungs: **`lSystemIterationsLevel0: 1`**, banded iteration growth + cap; lower **`procgenMinTurnCount`**; **`turtleStepPerLevel`** small vs old **0.08** |
 | 12 | 2026-03-29 | Header **relationship** to **`LEVEL_DESIGN_AND_PROCEDURE.md`** (methodology vs implementation) |
-| 13 | 2026-03-29 | §2 **Code ↔ documentation map** (table + mermaid); `game/procgen` and related files cite all three docs |
+| 13 | 2026-03-29 | §2 **Code ↔ documentation map** (table + mermaid); `game/procgen` and related files cite the companion docs |
 | 14 | 2026-03-29 | **Implementation sync:** `GameplaySettings.procgen` holds `verticalStep`, `jumpClearance`, platform half-extents, `minVerticalSymbolLevelStride`, `minStaticCountForGap`; `procgenMinVerticalSymbolCount`; `placeObstacles` guarantees ≥1 obstacle when **`n ≥ 2`** (§5.6) |
 | 15 | 2026-03-30 | **Compton & Mateas target:** §1 relationship + §2 docs table link **`PROCGEN_COMPTON_MATEAS.md`**; L-system noted as interim |

@@ -1,6 +1,6 @@
 import { quatToMat4 } from './Quat.js';
 
-/** Column-major 4×4, index `col * 4 + row` (same as WebGL uniformMatrix4fv). */
+/** Column-major 4×4, index `col * 4 + row` (OpenGL-style `uniformMatrix4fv` layout). */
 
 export const Mat4 = {
   /** @param {Float32Array | number[]} out */
@@ -114,7 +114,7 @@ export const Mat4 = {
   },
 
   /**
-   * Right-handed look-at: -Z forward (WebGL camera looks down -Z in view space).
+   * Right-handed look-at: -Z forward (camera looks down -Z in view space).
    * @param {Float32Array | number[]} out
    * @param {{ x: number, y: number, z: number }} eye
    * @param {{ x: number, y: number, z: number }} centre

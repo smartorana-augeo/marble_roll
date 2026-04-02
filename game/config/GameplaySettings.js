@@ -19,7 +19,7 @@
  * @property {number} pathWideDelta Added to occasional tiles for a wider strip.
  * @property {number} pathWideCap Upper clamp for boosted wide tiles.
  * @property {number} pathWideOverBase Tiles wider than level base + this use `pathWide` material.
- * @property {number} pathHalfXZClampStepFactor Max path half-extent as fraction of turtle step (XZ overlap guard); raise slightly for wider decks.
+ * @property {number} pathHalfXZClampStepFactor Max path half-extent as fraction of turtle step; **0.5** makes straight-run edges flush with centre spacing.
  * @property {number} stepUpRampConversionShare Fraction of `^F` pairs rewritten to ramp `r` (rest stay vertical step + tile).
  * @property {number} plazaHalfXZ Spawn pad half-extent XZ (world units).
  * @property {number} lSystemIterationsLevel0 Expansion passes on rung 0 (string length grows exponentially — keep low).
@@ -69,10 +69,11 @@ export const GameplaySettings = {
     pathWideCap: 2.08,
     pathWideOverBase: 0.38,
     /**
-     * Cap path half-width vs turtle step so consecutive slabs do not overlap in XZ (`≤ step × factor`).
-     * Slightly under 0.5 keeps a margin below full centre spacing.
+     * Cap path half-width vs turtle step (`≤ step × factor`). Use **0.5** so straight-run slab edges meet
+     * centre spacing (no hairline gap — avoids low-res sparkle into the clear). Slightly under 0.5 used to
+     * reduce co-planar overlap; deck depth bias in `WorldRenderer` handles plaza vs path instead.
      */
-    pathHalfXZClampStepFactor: 0.499,
+    pathHalfXZClampStepFactor: 0.5,
     /**
      * `^F` → `r` conversion rate for a ramp-heavy look. Keep low so **height jumps** (`^` then flat `F`)
      * remain common (grid jump injection uses `^F` / `v`+`F`).

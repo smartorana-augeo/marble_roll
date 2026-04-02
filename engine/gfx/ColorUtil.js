@@ -55,7 +55,7 @@ export function hslToRgb(h, s, l) {
 }
 
 /**
- * Mutates `rgb` length-3 array in linear 0..1 (Three.js `offsetHSL` analogue).
+ * Mutates `rgb` length-3 array in linear 0..1 (HSL-style hue/sat/light offsets).
  * @param {number[]} rgb
  * @param {number} dh
  * @param {number} ds

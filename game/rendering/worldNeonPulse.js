@@ -1,4 +1,9 @@
 import { offsetHslRgb } from '../../engine/gfx/ColorUtil.js';
+import { VisualSettings } from '../config/VisualSettings.js';
+
+function neonPulseSurfacesOn() {
+  return VisualSettings.world3d.neonPulseSurfaces === true;
+}
 
 /**
  * Per-tier tuning: smooth waves only (no random pops — “glitch” is layered sines + slow drift).
@@ -40,6 +45,11 @@ export class WorldNeonPulse {
     /** @type {object[]} */
     this._targets = [];
     this._holoGlitchSmoothed = 0;
+  }
+
+  /** When false, {@link update} is a no-op — skip calling it from the frame loop. */
+  get needsPulseUpdate() {
+    return this._targets.length > 0;
   }
 
   /**
@@ -85,15 +95,21 @@ export class WorldNeonPulse {
       });
     };
 
-    add('coin', 'coin', 0);
-    add('zoneStart', 'zone', 2.17);
-    add('zoneEnd', 'zone', 4.31);
-
-    for (const key of ['static', 'plaza', 'path', 'pathWide', 'ramp', 'lattice']) {
-      add(key, 'platform');
+    const w3d = VisualSettings.world3d;
+    if (w3d.coinHologramStatic !== true) {
+      add('coin', 'coin', 0);
     }
 
-    add('marble', 'marble', 1.15);
+    if (neonPulseSurfacesOn()) {
+      add('zoneStart', 'zone', 2.17);
+      add('zoneEnd', 'zone', 4.31);
+
+      for (const key of ['static', 'plaza', 'path', 'pathWide', 'ramp', 'lattice']) {
+        add(key, 'platform');
+      }
+
+      add('marble', 'marble', 1.15);
+    }
   }
 
   /**
@@ -102,6 +118,7 @@ export class WorldNeonPulse {
    */
   update(dt, materials) {
     if (!this._targets.length) return;
+    const w3d = VisualSettings.world3d;
     this._t += dt;
     const t = this._t;
 
@@ -111,7 +128,21 @@ export class WorldNeonPulse {
 
       if (b.hologram && m.kind === 'hologram') {
         const u = m.uniforms;
+        if (w3d.coinHologramStatic === true) {
+          u.uTime = 0;
+          u.uPulse = 1;
+          u.uHueShift = 0;
+          u.uGlitch = 0;
+          continue;
+        }
         u.uTime = t;
+        if (w3d.coinHologramReduced !== false) {
+          const ts = t * 0.95;
+          u.uPulse = 0.9 + 0.08 * Math.sin(ts * 2.1 + b.phase);
+          u.uHueShift = 0;
+          u.uGlitch = 0;
+          continue;
+        }
         const ts = t * b.speed * 0.72;
         const wave = Math.sin(ts * 2.25 + b.phase);
         const wave2 = Math.sin(ts * 5.1 + b.phase * 1.3);
@@ -133,6 +164,8 @@ export class WorldNeonPulse {
         u.uGlitch = this._holoGlitchSmoothed;
         continue;
       }
+
+      if (!neonPulseSurfacesOn()) continue;
 
       if (m.kind !== 'standard') continue;
 

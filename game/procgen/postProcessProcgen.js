@@ -13,9 +13,6 @@ import {
 
 const { minStaticCountForGap } = GameplaySettings.procgen;
 
-/** Late-run minimum path half-extent XZ (floor after width decay); matches `GameplaySettings.procgen`. */
-export const MIN_PLATFORM_HALF_XZ = GameplaySettings.procgen.pathPlatformHalfXZFloor;
-
 /** Wide starting pad (world units, half-extent XZ). */
 export const PLAZA_HALF_XZ = GameplaySettings.procgen.plazaHalfXZ;
 
@@ -100,13 +97,12 @@ function pathHalfXZ(levelIndex, pathIndex) {
 }
 
 /**
- * Caps horizontal half-extent so consecutive axis-aligned slabs (centre spacing ≈ turtle step)
- * do not overlap in XZ — avoids z-fighting shimmer on deck tops.
+ * Caps horizontal half-extent so consecutive slabs (centre spacing ≈ turtle step along straights) do not
+ * stay narrower than the step — `factor === 0.5` makes edges flush; lower values leave a hairline gap.
  */
 function clampPathHalfXZToTurtleStep(halfXZ, levelIndex) {
   const step = procgenTurtleStep(levelIndex);
-  const f =
-    GameplaySettings.procgen.pathHalfXZClampStepFactor ?? 0.485;
+  const f = GameplaySettings.procgen.pathHalfXZClampStepFactor ?? 0.5;
   return Math.min(halfXZ, step * f);
 }
 
@@ -172,7 +168,11 @@ export function computeKillPlaneY(staticEntries) {
   for (const e of staticEntries) {
     if (e.type !== 'box') continue;
     const hy = e.halfExtents[1];
-    const bottom = e.position[1] - hy;
+    /** Axis-aligned slabs: world min Y is centre minus local half height. Ramps use local Z along the slope — see `buildRampBox` (`minYBottom = midY - hy - L/2`). */
+    const bottom =
+      e.materialKey === 'ramp'
+        ? e.position[1] - hy - e.halfExtents[2]
+        : e.position[1] - hy;
     minY = Math.min(minY, bottom);
   }
   return Number.isFinite(minY) ? minY - 4 : -20;

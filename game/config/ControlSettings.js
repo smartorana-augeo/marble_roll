@@ -5,12 +5,17 @@
 export const ControlSettings = {
   marble: {
     /** Torque magnitude applied along world axes (cannon-es). */
-    torqueStrength: 24,
+    torqueStrength: 26,
     /** Upward impulse (N·s) at the centre of mass when jumping (mass ≈ 2). ~13 → Δv ≈ 6.5 m/s with g = 28. */
     jumpImpulse: 13,
-    /** Exponential decay per second for linear (xz) and angular velocity while Shift is held. */
-    brakeLinearDecay: 8.35,
-    brakeAngularDecay: 10.2,
+    /**
+     * While Shift (brake) is held, roll torque is multiplied by this. Full torque plus brake caused a
+     * stuck slow “strafe”; zero torque felt unresponsive. ~0.45–0.55 keeps steering without re-triggering that bug.
+     */
+    brakeSteerTorqueScale: 0.52,
+    /** Exponential decay per second for linear (xz) and angular velocity while Shift is held. Lower = spongier, less snappy. */
+    brakeLinearDecay: 7.45,
+    brakeAngularDecay: 9.1,
     keys: {
       forward: 'KeyW',
       back: 'KeyS',
@@ -51,4 +56,9 @@ export const ControlSettings = {
 
   /** Marble centre Y below spawn Y minus this value triggers a fall death. */
   fallDeathBelowSpawn: 12,
+  /**
+   * When applying `descriptor.killPlaneY`, clamp so the plane never sits above
+   * `spawn[1] - fallKillPlaneMarginBelowSpawn` (avoids bogus “out of bounds” if the value is corrupt).
+   */
+  fallKillPlaneMarginBelowSpawn: 2,
 };

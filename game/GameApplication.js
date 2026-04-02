@@ -16,6 +16,7 @@ import { ControlSettings } from './config/ControlSettings.js';
 import { applyControlBindingsToMenuKeys, DisplaySettings } from './config/DisplaySettings.js';
 import { GameplaySettings } from './config/GameplaySettings.js';
 import { SceneLightingSettings } from './config/SceneLightingSettings.js';
+import { VisualSettings } from './config/VisualSettings.js';
 import { applyPixelWorldMapsToMaterials } from './rendering/pixelWorldMaps.js';
 import { createMaterialPalette } from './rendering/MaterialPalette.js';
 import { WorldNeonPulse } from './rendering/worldNeonPulse.js';
@@ -124,12 +125,14 @@ export class GameApplication {
     this._fallCount = 0;
 
     this.worldRenderer = new WorldRenderer(this.canvas, SceneLightingSettings);
-    this.worldRenderer.setDevicePixelRatioCap(2);
+    const w3d = VisualSettings.world3d;
+    this.worldRenderer.setDevicePixelRatioCap(w3d.devicePixelRatioCap);
+    this.worldRenderer.setInternalResolutionScale(w3d.internalResolutionScale);
     this.worldRenderer.setClearColor(0, 0, 0, 0);
 
     this.renderMeshes = [];
     this.marbleSceneMesh = new SceneMesh();
-    this.marbleSceneMesh.primitive = 'sphereHi';
+    this.marbleSceneMesh.primitive = 'sphereLow';
     this.marbleSceneMesh.materialKey = 'marble';
     this.marbleSceneMesh.castShadow = true;
     this.marbleSceneMesh.receiveShadow = false;
@@ -160,6 +163,16 @@ export class GameApplication {
     this._torqueAxis = { x: 0, y: 0, z: 0 };
     this._torque = new Vec3();
 
+    /** Reused each frame — avoids allocating a camera descriptor for {@link WorldRenderer.render}. */
+    this._renderCam = {
+      fovDeg: 58,
+      aspect: 1,
+      near: 0.1,
+      far: 200,
+      eye: this._camEye,
+      target: this._camTarget,
+    };
+
     this._loop = new GameLoop((dt) => this._onFrame(dt));
 
     this._resize = () => this._onResize();
@@ -169,6 +182,8 @@ export class GameApplication {
       if (e.code === 'Space') e.preventDefault();
     };
     this.canvas?.addEventListener('keydown', this._onCanvasKeyDown);
+
+    this._onResize();
   }
 
   async start() {
@@ -188,26 +203,14 @@ export class GameApplication {
     wireCreditsOverlay();
     /** Load first playlist track; playback still needs a user gesture (see unlock listener below). */
     this.music.ensureInitialTrack();
-    const uiRoot = document.getElementById('ui-root');
-    uiRoot?.addEventListener(
-      'pointerdown',
-      () => {
-        this.music.ensurePlayback();
-      },
-      { once: true, capture: true },
-    );
     this._hydrateBundleFromInlineManifest();
     this._applyDisplayBranding();
     this.ui.setMenuManifestLoading(!this.bundle);
     this._loop.start();
 
     if (!this.bundle) {
-      console.log('[marble] loading level manifest…');
       await this._loadLevelBundle();
-    } else {
-      console.log('[marble] level manifest from inline #marble-level-manifest (fetch skipped).');
     }
-    console.log('[marble] ready — flat materials only; filter [procgen] or [level] for timings.');
 
     this.ui.setMenuManifestLoading(false);
     this.ui.showMenu();
@@ -266,7 +269,6 @@ export class GameApplication {
       const ctrl = new AbortController();
       const t = window.setTimeout(() => ctrl.abort(), 20000);
       try {
-        console.log('[marble] fetching manifest:', href);
         const res = await fetch(href, { signal: ctrl.signal, cache: 'no-store' });
         if (!res.ok) {
           lastErr = new Error(`Failed to load levels: ${res.status}`);
@@ -291,11 +293,6 @@ export class GameApplication {
 
   _registerCommands() {
     this.queue.register('START_GAME', () => {
-      console.log('[marble:flow] ③ START_GAME handler', {
-        loadInProgress: this._levelLoadInProgress,
-        hasBundle: !!this.bundle,
-        state: this.states.state,
-      });
       if (this._levelLoadInProgress) {
         console.warn('[marble:flow] ③a abort: _levelLoadInProgress');
         return;
@@ -311,9 +308,7 @@ export class GameApplication {
       this.coinLedger.startNewRun();
       this._fallCount = 0;
       this.session.currentLevelIndex = 0;
-      console.log('[marble:flow] ④ calling _runLevelLoadFlow(0)');
       void this._runLevelLoadFlow(this.session.currentLevelIndex, () => {
-        console.log('[marble:flow] ⑫ done callback: entering playing + focus');
         this.states.setState('playing');
         this._focusPlay();
       });
@@ -455,30 +450,35 @@ export class GameApplication {
    * @param {{ type: string, payload?: object }} cmd
    */
   _enqueueAndDrain(cmd) {
-    console.log('[marble:flow] enqueue', cmd.type);
     this.queue.enqueue(cmd);
     this.queue.drain(16);
-    console.log('[marble:flow] enqueue returned after drain', cmd.type);
   }
 
   _wireUi() {
     if (!this.ui.btnNewGame) {
       console.error('[marble:flow] #btn-new-game is null — wireUi cannot attach listeners.');
     } else {
-      console.log('[marble:flow] wiring #btn-new-game (click + pointerdown capture)');
+      /** Primary pointer starts the run on `pointerdown` so the first tap always registers (click can lag or be swallowed after audio unlock / touch). Keyboard uses `click` only — see skip flag below. */
+      let newGameActivatedByPointer = false;
+      const startNewGame = () => {
+        this.music.ensurePlayback();
+        this._enqueueAndDrain({ type: 'START_GAME' });
+      };
+      this.ui.btnNewGame.addEventListener('pointerdown', (e) => {
+        if (this.ui.btnNewGame?.disabled) return;
+        if (e.button !== 0) return;
+        newGameActivatedByPointer = true;
+        startNewGame();
+      });
+      this.ui.btnNewGame.addEventListener('click', () => {
+        if (newGameActivatedByPointer) {
+          newGameActivatedByPointer = false;
+          return;
+        }
+        if (this.ui.btnNewGame?.disabled) return;
+        startNewGame();
+      });
     }
-    this.ui.btnNewGame?.addEventListener(
-      'pointerdown',
-      () => {
-        console.log('[marble:flow] ① pointerdown on New game (reaches button)');
-      },
-      true,
-    );
-    this.ui.btnNewGame?.addEventListener('click', () => {
-      console.log('[marble:flow] ② click on New game');
-      this.music.ensurePlayback();
-      this._enqueueAndDrain({ type: 'START_GAME' });
-    });
     this.ui.btnContinue?.addEventListener('click', () => {
       this._enqueueAndDrain({ type: 'ADVANCE_LEVEL' });
     });
@@ -536,7 +536,6 @@ export class GameApplication {
    * @param {() => void} [done]
    */
   async _runLevelLoadFlow(index, done) {
-    console.log('[marble:flow] ⑤ _runLevelLoadFlow entry', { index });
     if (this._levelLoadInProgress) {
       console.warn('[marble:flow] ⑤a abort: already in progress');
       return;
@@ -549,7 +548,6 @@ export class GameApplication {
     const levelLabel = formatLevelLabel(index);
     this.ui.showLevelLoadingScreen(`Generating level ${levelLabel}…`);
     try {
-      console.log('[marble:flow] ⑥ await yieldToPaint (loading overlay should paint)');
       await yieldToPaint();
       if (!this.bundle) {
         console.warn('[marble:flow] ⑥a abort: bundle cleared');
@@ -559,15 +557,11 @@ export class GameApplication {
       /** @type {object | undefined} */
       let descriptor;
       if (this.bundle.procgen) {
-        console.log('[marble:flow] ⑦ await generateProcgenDescriptor…');
         descriptor = await generateProcgenDescriptor(index, {
           yieldForUi: () => yieldToPaint(),
           onProgress: (info) => {
             this.ui.setLevelLoadProgress(info.fraction * 0.75, info.label);
           },
-        });
-        console.log('[marble:flow] ⑧ generateProcgenDescriptor resolved', {
-          id: descriptor?.id,
         });
       } else {
         this.ui.setLevelLoadProgress(0.25, 'Loading level data…');
@@ -588,18 +582,9 @@ export class GameApplication {
 
       this.ui.setLevelLoadProgress(0.75, 'Building meshes…');
       await yieldToPaint();
-      console.log('[marble:flow] ⑨ _applyLoadedLevel (LevelLoader.build)…');
-      const t0 = performance.now();
       this._applyLoadedLevel(descriptor, index);
-      console.log(
-        `[marble:flow] ⑩ level meshes ready in ${(performance.now() - t0).toFixed(1)}ms`,
-      );
-      console.log(
-        `[level] index ${index} loaded in ${(performance.now() - t0).toFixed(1)}ms (procgen + meshes)`,
-      );
       this.ui.setLevelLoadProgress(1, '');
       await yieldToPaint();
-      console.log('[marble:flow] ⑪ invoking done() → playing state');
       done?.();
       if (isEmbedActive()) {
         notifyLevelLoaded({ levelIndex: this.session.currentLevelIndex });
@@ -608,7 +593,6 @@ export class GameApplication {
       console.error('[marble:flow] load failed (catch)', err);
       console.error('[level] load failed', err);
     } finally {
-      console.log('[marble:flow] ⑬ finally: hide loading overlay, clear load lock');
       this.ui.hideLevelLoadingScreen();
       this._levelLoadInProgress = false;
     }
@@ -648,13 +632,8 @@ export class GameApplication {
    * @param {number} index
    */
   _applyLoadedLevel(descriptor, index) {
-    console.log('[marble:flow] ⑨a levelLoader.clear');
     this.levelLoader.clear(this.physics.world, this.renderMeshes);
-    const tBuild = performance.now();
-    console.log('[marble:flow] ⑨b levelLoader.build…');
     const built = this.levelLoader.build(this.physics.world, this.renderMeshes, this._materials, descriptor);
-    console.log(`[marble:flow] ⑨c LevelLoader.build done ${(performance.now() - tBuild).toFixed(1)}ms`);
-    console.log(`[level] LevelLoader.build ${(performance.now() - tBuild).toFixed(1)}ms`);
     this._spawn = /** @type {[number, number, number]} */ ([
       descriptor.spawn[0],
       descriptor.spawn[1],
@@ -663,10 +642,20 @@ export class GameApplication {
     this._goal = built.goal;
     this._zones = built.zones;
     this._startZoneTouched = false;
-    this._killPlaneY =
-      typeof descriptor.killPlaneY === 'number'
-        ? descriptor.killPlaneY
-        : this._spawn[1] - ControlSettings.fallDeathBelowSpawn;
+    {
+      const fallback = this._spawn[1] - ControlSettings.fallDeathBelowSpawn;
+      let k =
+        typeof descriptor.killPlaneY === 'number' &&
+        Number.isFinite(descriptor.killPlaneY)
+          ? descriptor.killPlaneY
+          : fallback;
+      if (!Number.isFinite(k)) k = fallback;
+      const maxKillY =
+        this._spawn[1] - ControlSettings.fallKillPlaneMarginBelowSpawn;
+      let plane = Math.min(k, maxKillY);
+      if (!Number.isFinite(plane)) plane = fallback;
+      this._killPlaneY = plane;
+    }
     this._resetCameraOrbit();
     this.session.loadedLevelId = descriptor.id;
     this.session.currentLevelIndex = index;
@@ -682,6 +671,7 @@ export class GameApplication {
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    this._viewAspect = w / Math.max(1, h);
     this.worldRenderer.setSize(w, h);
   }
 
@@ -693,7 +683,9 @@ export class GameApplication {
     this._enqueueInputCommands();
     this.queue.drain(16);
 
-    this._worldNeonPulse.update(deltaSeconds, this._materials);
+    if (this._worldNeonPulse.needsPulseUpdate) {
+      this._worldNeonPulse.update(deltaSeconds, this._materials);
+    }
 
     if (this.states.is('playing')) {
       if (this._embedFirstInteractionPending) {
@@ -724,21 +716,8 @@ export class GameApplication {
     }
 
     this._syncMarbleMesh();
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const aspect = w / Math.max(1, h);
-    this.worldRenderer.render(
-      {
-        fovDeg: 58,
-        aspect,
-        near: 0.1,
-        far: 200,
-        eye: this._camEye,
-        target: this._camTarget,
-      },
-      this.renderMeshes,
-      this._materials,
-    );
+    this._renderCam.aspect = this._viewAspect;
+    this.worldRenderer.render(this._renderCam, this.renderMeshes, this._materials);
   }
 
   _enqueueInputCommands() {
@@ -797,7 +776,7 @@ export class GameApplication {
     if (!body) return;
 
     const marble = ControlSettings.marble;
-    const { torqueStrength, keys } = marble;
+    const { torqueStrength, keys, brakeSteerTorqueScale } = marble;
 
     this._camForward.x = this._camTarget.x - this._camEye.x;
     this._camForward.y = 0;
@@ -835,17 +814,21 @@ export class GameApplication {
       this._rollWant.z += this._camRight.z;
     }
 
+    const braking = this.input.isBrakeActive();
+    const torqueMul = braking ? brakeSteerTorqueScale : 1;
+
     if (vec3LengthSq(this._rollWant) >= 1e-10) {
       vec3Normalize(this._rollWant);
       vec3Cross(this._torqueAxis, this._worldUp, this._rollWant);
-      this._torqueAxis.x *= torqueStrength;
-      this._torqueAxis.y *= torqueStrength;
-      this._torqueAxis.z *= torqueStrength;
+      const ts = torqueStrength * torqueMul;
+      this._torqueAxis.x *= ts;
+      this._torqueAxis.y *= ts;
+      this._torqueAxis.z *= ts;
       this._torque.set(this._torqueAxis.x, this._torqueAxis.y, this._torqueAxis.z);
       body.applyTorque(this._torque);
     }
 
-    if (this.input.isBrakeActive()) {
+    if (braking) {
       const kl = Math.exp(-marble.brakeLinearDecay * deltaSeconds);
       const ka = Math.exp(-marble.brakeAngularDecay * deltaSeconds);
       body.velocity.x *= kl;
@@ -941,7 +924,9 @@ export class GameApplication {
   _checkFall() {
     const body = this.physics.marbleBody;
     if (!body) return;
-    if (body.position.y >= this._killPlaneY) return;
+    const y = body.position.y;
+    if (!Number.isFinite(y) || !Number.isFinite(this._killPlaneY)) return;
+    if (y >= this._killPlaneY) return;
     /**
      * Apply immediately — do not enqueue `MARBLE_DIED`. Several events can drain in one batch; the
      * first sets `marbleDead`, so later copies see `!playing` and skip, under-counting falls.

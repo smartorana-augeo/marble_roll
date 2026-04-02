@@ -13,7 +13,7 @@ export class SceneMesh {
     this.castShadow = true;
     this.receiveShadow = true;
     /**
-     * `box` | `boxWire` | `sphereHi` | `sphereMed` | `cylinderCoin`
+     * `box` | `boxWire` | `sphereHi` | `sphereMed` | `sphereLow` | `cylinderCoin`
      * @type {string}
      */
     this.primitive = 'box';

@@ -96,7 +96,7 @@ export class LevelLoader {
     } else if (descriptor.goal) {
       const g = descriptor.goal;
       const gm = new SceneMesh();
-      gm.primitive = 'sphereMed';
+      gm.primitive = 'sphereLow';
       gm.materialKey = 'goal';
       gm.position.x = g.position[0];
       gm.position.y = g.position[1];
@@ -156,11 +156,13 @@ export class LevelLoader {
   _addZoneDisc(meshList, zone, matKey) {
     const r = zone.radius;
     const h = 0.07;
+    /** Slight lift so the disc base is not coplanar with the deck top (avoids shimmer with the plaza slab). */
+    const aboveDeck = 0.02;
     const mesh = new SceneMesh();
     mesh.primitive = 'cylinderCoin';
     mesh.materialKey = matKey;
     mesh.position.x = zone.position[0];
-    mesh.position.y = zone.position[1] + h / 2;
+    mesh.position.y = zone.position[1] + h / 2 + aboveDeck;
     mesh.position.z = zone.position[2];
     mesh.scale.x = r;
     mesh.scale.y = h;

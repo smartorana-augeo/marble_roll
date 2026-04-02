@@ -2,8 +2,7 @@
 
 ## Development
 
-**Sam Martorana** — game design and code.
-
+**Sam Martorana**
 **<<Augeo>>**
 
 ## Audio

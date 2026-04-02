@@ -77,16 +77,6 @@ export function getSessionUid() {
   return _sessionUid;
 }
 
-export function isWebGLAvailable() {
-  if (typeof document === 'undefined') return false;
-  try {
-    const canvas = document.createElement('canvas');
-    return !!canvas.getContext('webgl2');
-  } catch {
-    return false;
-  }
-}
-
 export function notifyReady() {
   if (!_active) return;
   postToParent({

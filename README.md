@@ -1,6 +1,6 @@
 # Marble roll
 
-**3D** marble platformer (Three.js + cannon-es). The Canvas **2D** side-runner prototype lives on git branch **`preserve/2d-side-runner`**.
+**3D** marble platformer: **cannon-es** physics and a **Canvas 2D** world rasteriser (no external 3D engine). The older **2D** side-runner prototype lives on git branch **`preserve/2d-side-runner`**.
 
 Static web game served over HTTP (ES modules and asset fetches require a server; opening `index.html` from the file system is not supported).
 
@@ -39,7 +39,7 @@ To stop the server, press `Ctrl+C` in the terminal.
 
 ## Embedding (Encore / Grove / iframes)
 
-The game can sit in an `<iframe>` on your site. It uses **WebGL**; the host page must allow accelerated canvas (no blanket canvas fingerprint blocking).
+The game can sit in an `<iframe>` on your site. It draws with **`canvas.getContext('2d')`**; the host page must allow canvas access (some privacy extensions block canvas reads).
 
 **Query parameters**
 

@@ -22,7 +22,7 @@ The implementation may still use **rigid-body physics** under the hood; the **pl
 
 ## 2. Core fantasy: what is the drone doing?
 
-Pick **one** primary fiction early; it drives level goals, UI copy, and art direction. Three strong options:
+Pick **one** primary fiction early; it drives level goals, UI copy, and art direction. Several strong options:
 
 ### 2.1 Maintenance / repair drone
 

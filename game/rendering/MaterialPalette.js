@@ -2,7 +2,7 @@ import { createCoinHologramMaterial } from './coinHologramMaterial.js';
 
 /**
  * Built-in renderer material definitions (no external 3D library).
- * Colours match the prior Three.js `MeshStandardMaterial` setup in `GameApplication`.
+ * Colours tuned for the built-in Canvas rasteriser (`WorldRenderer`).
  *
  * @returns {Record<string, object>}
  */
@@ -10,11 +10,11 @@ export function createMaterialPalette() {
   return {
     static: {
       kind: 'standard',
-      baseColor: hexToRgb(0x711c91),
-      roughness: 0.96,
+      baseColor: hexToRgb(0x8e40b0),
+      roughness: 0.88,
       metalness: 0.03,
-      emissive: hexToRgb(0x2a0d38),
-      emissiveIntensity: 0.07,
+      emissive: hexToRgb(0x5c2480),
+      emissiveIntensity: 0.34,
       opacity: 1,
       transparent: false,
       depthWrite: true,
@@ -26,11 +26,11 @@ export function createMaterialPalette() {
     },
     plaza: {
       kind: 'standard',
-      baseColor: hexToRgb(0x711c91),
-      roughness: 0.94,
+      baseColor: hexToRgb(0x8e40b0),
+      roughness: 0.86,
       metalness: 0.04,
-      emissive: hexToRgb(0x3d1560),
-      emissiveIntensity: 0.1,
+      emissive: hexToRgb(0x682898),
+      emissiveIntensity: 0.38,
       opacity: 1,
       transparent: false,
       depthWrite: true,
@@ -42,11 +42,11 @@ export function createMaterialPalette() {
     },
     path: {
       kind: 'standard',
-      baseColor: hexToRgb(0x711c91),
-      roughness: 0.96,
+      baseColor: hexToRgb(0x8e40b0),
+      roughness: 0.88,
       metalness: 0.04,
-      emissive: hexToRgb(0x2a0d38),
-      emissiveIntensity: 0.06,
+      emissive: hexToRgb(0x562070),
+      emissiveIntensity: 0.32,
       opacity: 1,
       transparent: false,
       depthWrite: true,
@@ -58,11 +58,11 @@ export function createMaterialPalette() {
     },
     pathWide: {
       kind: 'standard',
-      baseColor: hexToRgb(0xea00d9),
-      roughness: 0.9,
+      baseColor: hexToRgb(0xf860f0),
+      roughness: 0.76,
       metalness: 0.06,
-      emissive: hexToRgb(0x6b0062),
-      emissiveIntensity: 0.12,
+      emissive: hexToRgb(0xe028d0),
+      emissiveIntensity: 0.58,
       opacity: 1,
       transparent: false,
       depthWrite: true,
@@ -74,11 +74,11 @@ export function createMaterialPalette() {
     },
     ramp: {
       kind: 'standard',
-      baseColor: hexToRgb(0xea00d9),
-      roughness: 0.92,
+      baseColor: hexToRgb(0xf860f0),
+      roughness: 0.78,
       metalness: 0.05,
-      emissive: hexToRgb(0x5c0054),
-      emissiveIntensity: 0.09,
+      emissive: hexToRgb(0xd020b8),
+      emissiveIntensity: 0.52,
       opacity: 1,
       transparent: false,
       depthWrite: true,
@@ -109,7 +109,7 @@ export function createMaterialPalette() {
       metalness: 0.22,
       emissive: hexToRgb(0x045a61),
       emissiveIntensity: 0.45,
-      opacity: 0.58,
+      opacity: 0.42,
       transparent: true,
       depthWrite: false,
       wireframe: false,
@@ -123,7 +123,7 @@ export function createMaterialPalette() {
       metalness: 0.2,
       emissive: hexToRgb(0x8b2500),
       emissiveIntensity: 0.5,
-      opacity: 0.58,
+      opacity: 0.42,
       transparent: true,
       depthWrite: false,
       wireframe: false,
@@ -132,11 +132,11 @@ export function createMaterialPalette() {
     },
     lattice: {
       kind: 'standard',
-      baseColor: hexToRgb(0x0abdc6),
-      roughness: 0.9,
+      baseColor: hexToRgb(0x1cd4e0),
+      roughness: 0.84,
       metalness: 0.1,
-      emissive: hexToRgb(0x045a61),
-      emissiveIntensity: 0.16,
+      emissive: hexToRgb(0x0898a2),
+      emissiveIntensity: 0.4,
       opacity: 1,
       transparent: false,
       depthWrite: true,

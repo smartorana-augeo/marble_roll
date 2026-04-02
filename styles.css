@@ -30,6 +30,11 @@
   --hud-neon-magenta: #ff3da8;
   --hud-neon-amber: #ffc14f;
   --hud-panel-face: rgba(4, 10, 26, 0.9);
+  /** In-game HUD: flat fills + offset shadows (8-bit chrome) */
+  --hud-8bit-face: rgba(6, 14, 30, 0.97);
+  --hud-8bit-border: rgba(72, 220, 255, 0.92);
+  --hud-8bit-shadow: 4px 4px 0 rgba(0, 0, 0, 0.58);
+  --hud-8bit-shadow-inset: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
   /** Set from `VisualSettings` via `applyVisualSettingsToDom` (fallbacks for first paint) */
   --vs-hud-panel-glow:
     0 0 12px rgba(93, 232, 255, 0.28),
@@ -167,6 +172,9 @@ html:not(.vs-crt-bg-wobble-off) #app::before {
   outline: none;
   position: relative;
   z-index: 0;
+  /* Backing store may be below CSS size — smooth upscale only (no full-canvas blur: too expensive). */
+  image-rendering: auto;
+  image-rendering: smooth;
 }
 
 #ui-root {
@@ -192,6 +200,7 @@ html:not(.vs-crt-bg-wobble-off) #app::before {
 #ui-root .btn-mute-wrap,
 #ui-root button {
   pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .screen {
@@ -381,6 +390,22 @@ html:not(.vs-crt-bg-wobble-off) #app::before {
 .btn-mute:focus-visible {
   outline: 2px solid var(--hud-neon-magenta, #ff3da8);
   outline-offset: 2px;
+}
+
+#hud .btn-mute {
+  background: var(--hud-8bit-face);
+  border: 2px solid var(--hud-8bit-border);
+  border-left-width: 3px;
+  border-left-color: var(--hud-neon-magenta);
+  padding: 0.14rem 0.28rem;
+  box-shadow: var(--hud-8bit-shadow);
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(24, 0, 18, 0.4);
+}
+
+#hud .btn-mute:hover {
+  filter: brightness(1.12);
 }
 
 .btn-mute__label {
@@ -895,9 +920,12 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
 #hud.hud {
   --hud-pad-inline: clamp(0.35rem, 0.15rem + 1.1vw, 0.65rem);
   --hud-pad-block: clamp(0.28rem, 0.1rem + 0.85vw, 0.5rem);
-  font-size: clamp(0.62rem, 0.22rem + 1.35vw, 1.06rem);
+  font-size: clamp(0.65rem, 0.24rem + 1.38vw, 1.08rem);
   gap: clamp(0.35rem, 0.15rem + 1.5vw, 0.75rem);
-  --hud-centre-scale: 1.14;
+  --hud-centre-scale: 1.16;
+  font-family: var(--font-ui);
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: none;
 }
 
 .hud-panel {
@@ -983,24 +1011,15 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   padding: clamp(0.06em, 0.02em + 0.25vw, 0.14em) clamp(0.1em, 0.04em + 0.35vw, 0.2em);
 }
 
-/** Cyberpunk treatment: scoped to `#hud` so `.menu-panel.hud-panel` stays unchanged */
+/** 8-bit style: flat panel, chunky offset shadow, magenta spine — scoped to `#hud` */
 #hud .hud-panel {
   position: relative;
   border-radius: 0;
   padding: var(--hud-pad-block, 0.45rem) var(--hud-pad-inline, 1rem) calc(var(--hud-pad-block, 0.45rem) + 0.05rem);
-  background:
-    linear-gradient(145deg, rgba(0, 255, 255, 0.07) 0%, transparent 42%),
-    linear-gradient(315deg, rgba(255, 61, 168, 0.05) 0%, transparent 38%),
-    var(--hud-panel-face);
-  border: 1px solid rgba(93, 232, 255, 0.55);
-  border-left: 3px solid var(--hud-neon-magenta);
-  box-shadow:
-    0 0 18px rgba(93, 232, 255, 0.18),
-    0 0 2px rgba(93, 232, 255, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    4px 4px 0 rgba(0, 0, 0, 0.45),
-    var(--vs-hud-panel-glow);
+  background: var(--hud-8bit-face);
+  border: 2px solid var(--hud-8bit-border);
+  border-left: 4px solid var(--hud-neon-magenta);
+  box-shadow: var(--hud-8bit-shadow), var(--hud-8bit-shadow-inset);
 }
 
 #hud .hud-panel::before {
@@ -1009,14 +1028,9 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    var(--hud-neon-magenta),
-    var(--hud-neon-cyan) 45%,
-    transparent 100%
-  );
-  opacity: 0.85;
+  height: 2px;
+  background: var(--hud-neon-cyan);
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -1024,13 +1038,13 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   align-self: stretch;
   width: 100%;
   max-width: min(15.5rem, min(100%, 38vw));
-  font-size: 0.92em;
-  line-height: 1.32;
-  color: rgba(190, 245, 255, 0.92);
-  letter-spacing: 0.03em;
+  font-size: 0.94em;
+  line-height: 1.25;
+  color: rgba(200, 248, 255, 0.95);
+  letter-spacing: 0.06em;
   text-shadow:
-    0 0 8px rgba(93, 232, 255, 0.35),
-    0 0 1px rgba(93, 232, 255, 0.8);
+    2px 2px 0 rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 8, 20, 0.5);
 }
 
 #hud .hud-legend__line {
@@ -1047,14 +1061,14 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: ui-monospace, monospace;
-  font-size: 0.9em;
+  font-family: var(--font-ui);
+  font-size: 0.92em;
   line-height: 1.15;
   letter-spacing: 0;
   color: var(--hud-neon-magenta);
   text-shadow:
-    0 0 8px rgba(255, 61, 168, 0.45),
-    0 0 1px rgba(255, 200, 240, 0.7);
+    2px 2px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(40, 0, 28, 0.45);
 }
 
 #hud .hud-legend__text {
@@ -1073,11 +1087,11 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   min-width: 0;
   text-align: left;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: rgba(190, 245, 255, 0.98);
+  letter-spacing: 0.06em;
+  color: rgba(200, 252, 255, 0.98);
   text-shadow:
-    0 0 10px rgba(93, 232, 255, 0.42),
-    0 0 2px rgba(93, 232, 255, 0.95);
+    2px 2px 0 rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 12, 24, 0.45);
 }
 
 #hud .hud-legend__keys {
@@ -1085,18 +1099,17 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   min-width: 0;
   text-align: right;
   font-weight: 400;
-  letter-spacing: 0.03em;
-  opacity: 0.88;
-  color: rgba(200, 238, 255, 0.92);
+  letter-spacing: 0.05em;
+  opacity: 0.92;
+  color: rgba(210, 242, 255, 0.94);
   text-shadow:
-    0 0 14px rgba(93, 232, 255, 0.5),
-    0 0 8px rgba(93, 232, 255, 0.35),
-    0 0 2px rgba(140, 210, 255, 0.45);
+    1px 1px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 10, 22, 0.4);
 }
 
 #hud .hud-centre {
-  text-shadow: 0 0 10px rgba(93, 232, 255, 0.15);
-  font-size: calc(1em * var(--hud-centre-scale, 1.14));
+  text-shadow: none;
+  font-size: calc(1em * var(--hud-centre-scale, 1.16));
   padding-inline: calc(var(--hud-pad-inline, 0.55rem) * 1.15);
   padding-block: calc(var(--hud-pad-block, 0.35rem) * 1.12);
 }
@@ -1117,21 +1130,24 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
 
 #hud .hud-row--title {
   color: var(--hud-neon-cyan);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 1.14em;
+  font-size: clamp(1.12rem, 0.78rem + 1.65vw, 1.88rem);
+  line-height: 1.08;
+  font-weight: 400;
   text-shadow:
-    0 0 12px rgba(93, 232, 255, 0.45),
-    0 0 2px rgba(93, 232, 255, 0.9);
+    3px 3px 0 rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(0, 20, 36, 0.55);
 }
 
 #hud .hud-row--coins {
-  font-size: 1.05em;
+  font-size: 1.08em;
   color: var(--hud-neon-amber);
   opacity: 1;
+  letter-spacing: 0.05em;
   text-shadow:
-    0 0 10px rgba(255, 193, 79, 0.35),
-    0 0 1px rgba(255, 140, 90, 0.6);
+    2px 2px 0 rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(36, 20, 0, 0.45);
 }
 
 /** Narrower than the coins/run row (~⅔ width); spaced ASCII fall markers. */
@@ -1144,8 +1160,8 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   max-width: 100%;
   margin: 0.12em auto 0.38em;
   box-sizing: border-box;
-  font-family: ui-monospace, monospace;
-  letter-spacing: 0.06em;
+  font-family: var(--font-ui);
+  letter-spacing: 0.08em;
   line-height: 1;
 }
 
@@ -1166,10 +1182,8 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   font-weight: 700;
   color: var(--hud-neon-magenta, #ff3da8);
   text-shadow:
-    0 0 14px rgba(255, 61, 168, 0.88),
-    0 0 26px rgba(255, 61, 168, 0.42),
-    2px 0 0 rgba(255, 120, 200, 0.45),
-    -2px 0 0 rgba(160, 0, 90, 0.4);
+    2px 2px 0 rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(32, 0, 24, 0.5);
   animation: hud-fall-glitch 3.2s steps(1, end) infinite;
 }
 
@@ -1177,11 +1191,16 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
   font-weight: 700;
   color: var(--hud-neon-magenta, #ff3da8);
   text-shadow:
-    0 0 18px rgba(255, 61, 168, 0.98),
-    0 0 34px rgba(255, 61, 168, 0.55),
-    2px 0 0 rgba(255, 180, 220, 0.55),
-    -2px 0 0 rgba(120, 0, 70, 0.48);
+    2px 2px 0 rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(28, 0, 20, 0.55);
   animation: hud-fall-glitch 2.4s steps(1, end) infinite;
+}
+
+html.vs-hud-fall-glitch-off #hud .hud-fall-char--spent,
+html.vs-hud-fall-glitch-off #hud .hud-fall-char--terminal {
+  animation: none;
+  transform: none;
+  filter: none;
 }
 
 @keyframes hud-fall-glitch {
@@ -1246,8 +1265,8 @@ html.vs-btn-glitch #menu-heading.menu-heading--glitch {
 
 #hud .hud-sep {
   color: var(--hud-neon-magenta);
-  opacity: 0.55;
-  text-shadow: 0 0 6px rgba(255, 61, 168, 0.4);
+  opacity: 0.65;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
 }
 
 .level-complete-scores {
