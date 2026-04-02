@@ -38,6 +38,20 @@ export class UISystem {
     /** @type {string | null} */
     this._menuSubtitleDefault = null;
     this._fillHudControlLegend();
+    this._applyDevFeatureVisibility();
+  }
+
+  /** Hides dev-only controls when {@link GameplaySettings.dev.enabled} is false. */
+  _applyDevFeatureVisibility() {
+    if (GameplaySettings.dev.enabled) return;
+    const label = document.querySelector('.dev-mode-label');
+    if (label) label.hidden = true;
+    if (this.devModeCheckbox) {
+      this.devModeCheckbox.checked = false;
+      this.devModeCheckbox.disabled = true;
+    }
+    if (this.runOverDevActions) this.runOverDevActions.hidden = true;
+    if (this.devBypassWrap) this.devBypassWrap.hidden = true;
   }
 
   _fillHudControlLegend() {
@@ -258,7 +272,7 @@ export class UISystem {
    * Reads the menu “dev mode” checkbox so it stays correct after toggling mid-run.
    */
   _devModeFromCheckbox() {
-    return !!this.devModeCheckbox?.checked;
+    return !!GameplaySettings.dev.enabled && !!this.devModeCheckbox?.checked;
   }
 
   showMarbleDead() {

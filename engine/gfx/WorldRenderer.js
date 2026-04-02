@@ -352,10 +352,12 @@ function shadeHologram(mat, n, wx, wy, wz, eye, s, outRgb, fogDistOverride) {
   const u = mat.uniforms || {};
   const pulse = typeof u.uPulse === 'number' ? u.uPulse : 1;
   const hue = typeof u.uHueShift === 'number' ? u.uHueShift : 0;
-  const base = [0.12 + hue * 0.08, 0.82, 0.92];
-  let r = base[0] * pulse;
-  let g = base[1] * pulse * 0.95;
-  let b = base[2] * pulse;
+  const br = 0.12 + hue * 0.08;
+  const bg = 0.82;
+  const bb = 0.92;
+  let r = br * pulse;
+  let g = bg * pulse * 0.95;
+  let b = bb * pulse;
   const dist =
     typeof fogDistOverride === 'number' && Number.isFinite(fogDistOverride)
       ? fogDistOverride
@@ -392,6 +394,8 @@ export class WorldRenderer {
     this._internalResScale = 1;
     this._dpr = 1;
     this._clear = { r: 0, g: 0, b: 0, a: 0 };
+    /** Cached `fillStyle` when clear alpha > 0 — avoids allocating a new string every frame. */
+    this._clearFillStyle = '';
     this._proj = new Float32Array(16);
     this._view = new Float32Array(16);
     this._vp = new Float32Array(16);
@@ -477,6 +481,10 @@ export class WorldRenderer {
   /** @param {number} r @param {number} g @param {number} b @param {number} a */
   setClearColor(r, g, b, a) {
     this._clear = { r, g, b, a };
+    this._clearFillStyle =
+      a > 0.001
+        ? `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`
+        : '';
   }
 
   /** @param {number} cssW @param {number} cssH */
@@ -531,7 +539,7 @@ export class WorldRenderer {
     ctx.globalAlpha = 1;
     const c = this._clear;
     if (c.a > 0.001) {
-      ctx.fillStyle = `rgba(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)},${c.a})`;
+      ctx.fillStyle = this._clearFillStyle;
       ctx.fillRect(0, 0, W, H);
     } else {
       ctx.clearRect(0, 0, W, H);

@@ -464,6 +464,11 @@ html:not(.vs-crt-bg-wobble-off) #app::before {
   user-select: none;
 }
 
+/** Author `display: flex` above wins over the default `[hidden]` rule — match `.dev-bypass-wrap[hidden]`. */
+.dev-mode-label[hidden] {
+  display: none;
+}
+
 .dev-mode-label input {
   width: 1em;
   height: 1em;

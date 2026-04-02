@@ -190,6 +190,11 @@ export const GameplaySettings = {
    */
   dev: {
     /**
+     * When false (release builds), dev UI is hidden and dev mode is never active regardless of the menu
+     * checkbox. Set true for local development.
+     */
+    enabled: false,
+    /**
      * Run-over screen: show “restart this level” only when **dev mode** is enabled on the menu.
      * Clears falls and reloads the current level index. Set false to hide even in dev mode.
      */

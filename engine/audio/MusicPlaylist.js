@@ -29,10 +29,6 @@ export class MusicPlaylist {
       this._advanceToNextTrack();
     });
 
-    this._audio.addEventListener('loadeddata', () => {
-      console.log('[music] loaded', this._audio.src?.slice(-56));
-    });
-
     this._audio.addEventListener('error', () => {
       const err = this._audio.error;
       const codes = ['', 'ABORTED', 'NETWORK', 'DECODE', 'SRC_NOT_SUPPORTED'];
@@ -43,6 +39,17 @@ export class MusicPlaylist {
         src: this._audio.src?.slice(-80),
       });
     });
+
+    /** First pointer or key unlocks HTMLMediaElement playback under browser autoplay policies. */
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const unlock = () => {
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('keydown', unlock);
+        void this._tryPlay();
+      };
+      window.addEventListener('pointerdown', unlock, { passive: true });
+      window.addEventListener('keydown', unlock);
+    }
   }
 
   isMuted() {
@@ -94,7 +101,6 @@ export class MusicPlaylist {
     }
     this._loadedUrlIndex = idx;
     this._audio.src = this._urls[idx];
-    console.log('[music] track', idx, this._urls[idx]?.slice(-56));
     this._audio.load();
     this._applyVolumeToElement();
     void this._tryPlay();
@@ -113,13 +119,13 @@ export class MusicPlaylist {
 
   async _tryPlay() {
     try {
-      const wasPaused = this._audio.paused;
       await this._audio.play();
-      if (wasPaused) {
-        console.log('[music] playing', { track: this._loadedUrlIndex, muted: this._muted });
-      }
     } catch (err) {
-      console.warn('[music] play() blocked or failed — interact with the page (e.g. mute button)', err);
+      /** Expected until the user interacts with the document (see constructor unlock listeners). */
+      if (err && typeof err === 'object' && err.name === 'NotAllowedError') {
+        return;
+      }
+      console.warn('[music] play() failed', err);
     }
   }
 

@@ -506,7 +506,7 @@ export class GameApplication {
   }
 
   _syncDevModeFromCheckbox() {
-    this._devMode = !!this.ui.devModeCheckbox?.checked;
+    this._devMode = !!GameplaySettings.dev.enabled && !!this.ui.devModeCheckbox?.checked;
   }
 
   _focusPlay() {
